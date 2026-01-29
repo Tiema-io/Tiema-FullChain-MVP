@@ -1,1 +1,20 @@
-<Solution />
+<Solution>
+  <Folder Name="/docs/">
+    <File Path="GettingStarted.md" />
+  </Folder>
+  <Folder Name="/plugins/" />
+  <Folder Name="/scripts/" />
+  <Folder Name="/src/">
+    <Project Path="src/Tiema.Abstractions/Tiema.Abstractions.csproj" />
+    <Project Path="src/Tiema.Plugin.Sdk/Tiema.Plugin.Sdk.csproj" />
+    <Project Path="src/Tiema.Runtime/Tiema.Runtime.csproj" />
+  </Folder>
+  <Folder Name="/src/Demo.Plugins/">
+    <Project Path="src/Demo.Plugins/ModbusSensor/ModbusSensor.csproj" />
+    <Project Path="src/Demo.Plugins/SimpleAlarm/SimpleAlarm.csproj" />
+    <Project Path="src/Demo.Plugins/TemperatureLogic/TemperatureLogic.csproj" />
+  </Folder>
+  <Folder Name="/解决方案项/">
+    <File Path="README.md" />
+  </Folder>
+</Solution>

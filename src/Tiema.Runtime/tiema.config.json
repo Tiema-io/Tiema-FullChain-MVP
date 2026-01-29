@@ -1,0 +1,59 @@
+{
+  "container": {
+    "name": "Tiema MVP Demo",
+    "version": "0.1.0",
+    "scanIntervalMs": 100,
+    "maxConcurrentCycles": 5,
+    "logLevel": "Information"
+  },
+  "plugins": [
+    {
+      "name": "ModbusSensor",
+      "path": "../../../../plugins/net10.0/ModbusSensor.dll",
+      "enabled": true,
+      "priority": 0,
+      "configuration": {
+        "deviceIp": "192.168.1.100",
+        "devicePort": 502,
+        "slaveId": 1,
+        "pollingInterval": 1000
+      }
+    },
+    {
+      "name": "TemperatureLogic",
+      "path": "../../../../plugins/net10.0/TemperatureLogic.dll",
+      "enabled": true,
+      "priority": 1,
+      "configuration": {
+        "alarmThreshold": 30.0,
+        "hysteresis": 2.0
+      }
+    },
+    {
+      "name": "SimpleAlarm",
+      "path": "../../../../plugins/net10.0/SimpleAlarm.dll",
+      "enabled": true,
+      "priority": 2,
+      "configuration": {
+        "notificationEnabled": true,
+        "emailRecipients": [ "operator@plant.com" ]
+      }
+    }
+  ],
+  "tags": {
+    "enabled": true,
+    "persistToFile": true,
+    "persistencePath": "./data/tags.json",
+    "defaultTags": {
+      "System/Status": "Running",
+      "System/StartTime": "2024-01-01T00:00:00",
+      "System/CycleCount": 0
+    }
+  },
+  "messaging": {
+    "enabled": true,
+    "transport": "inmemory",
+    "host": "localhost",
+    "port": 50051
+  }
+}
