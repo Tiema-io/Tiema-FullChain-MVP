@@ -9,3 +9,4 @@
 
 ## Project-Specific Rules
 - Keep SimpleAlarm plugin's subscription-based demonstration; do not modify its subscription logic.
+- Prefer using `Initialize(IPluginContext)` as the canonical plugin initialization method; constructor injection can be optional or deprecated but not required.

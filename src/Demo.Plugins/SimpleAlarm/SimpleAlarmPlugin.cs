@@ -4,8 +4,8 @@ using Tiema.Abstractions;
 namespace SimpleAlarm
 {
     /// <summary>
-    /// 报警插件：订阅高温报警并记录/标记告警状态。
-    /// Alarm plugin: subscribes to high-temperature alarms and records/flags alarm state.
+    /// 报警插件：订阅高温报警并记录/标记告警状态（在 Initialize 中订阅，内部循环检查状态）。
+    /// Alarm plugin: subscribes to high-temp alarms and records/flags alarm state (subscribe in Initialize, internal loop checks state).
     /// </summary>
     public class SimpleAlarmPlugin : PluginBase
     {
@@ -36,9 +36,6 @@ namespace SimpleAlarm
         {
             Console.WriteLine($"[{Name}] 🚨 接收到高温报警! / Received high-temperature alarm!");
 
-            // 在实际场景这里可以扩展为发送通知（邮件/短信）或控制设备
-            // In real scenarios this can be extended to send notifications (email/SMS) or control devices.
-
             // 写入 Tag 系统：标记为有活动告警并保存最后一条消息
             // Write to Tag system: flag active alarm and save last message.
             Context.Tags.SetTag("Alarms/Active", true);
@@ -49,7 +46,7 @@ namespace SimpleAlarm
         /// 执行周期逻辑：每个周期检查告警状态并输出提示。
         /// Periodic execution logic: check alarm state each cycle and print a warning if active.
         /// </summary>
-        public override void Execute()
+        protected override void Execute()
         {
             // 从 Tag 系统读取告警状态（若不存在默认返回 false）
             // Read alarm state from Tag system (defaults to false if missing).

@@ -1,13 +1,11 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Text;
 using Tiema.Abstractions;
 
 namespace TemperatureLogic
 {
     /// <summary>
-    /// 逻辑处理插件：读取温度并在超限时发布高温报警消息。
-    /// Logic processing plugin: reads temperature and publishes a high-temperature alarm message when threshold is exceeded.
+    /// 逻辑处理插件：读取温度并在超限时发布高温报警消息（在内部循环中运行）。
+    /// Logic processing plugin: reads temperature and publishes high-temp alarm when threshold exceeded (runs in internal loop).
     /// </summary>
     public class TemperatureLogicPlugin : PluginBase
     {
@@ -23,10 +21,26 @@ namespace TemperatureLogic
         private const int ALARM_THRESHOLD = 30;
 
         /// <summary>
+        /// 执行周期（毫秒），插件将在此周期内重复执行逻辑。
+        /// Run interval in milliseconds. The plugin logic executes repeatedly in this interval.
+        /// </summary>
+        protected override int RunIntervalMs => 1000;
+
+        /// <summary>
+        /// 初始化逻辑，插件加载时调用。
+        /// Initialization logic, called when the plugin is loaded.
+        /// </summary>
+        protected override void OnInitialize()
+        {
+            base.OnInitialize();
+            // 可读取配置
+        }
+
+        /// <summary>
         /// 执行周期逻辑：从 Tag 系统读取温度并根据阈值决定是否发布报警消息。
         /// Execution logic per cycle: read temperature from Tag system and publish alarm message if threshold exceeded.
         /// </summary>
-        public override void Execute()
+        protected override void Execute()
         {
             // 从 Tag 系统读取温度（示例 key: "Plant/Temperature"）
             // Read temperature from Tag system (example key: "Plant/Temperature")
