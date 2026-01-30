@@ -3,7 +3,9 @@
     <File Path="GettingStarted.md" />
   </Folder>
   <Folder Name="/plugins/" />
-  <Folder Name="/scripts/" />
+  <Folder Name="/scripts/">
+    <File Path="scripts/build.ps1" />
+  </Folder>
   <Folder Name="/src/">
     <Project Path="src/Tiema.Abstractions/Tiema.Abstractions.csproj" />
     <Project Path="src/Tiema.Plugin.Sdk/Tiema.Plugin.Sdk.csproj" />

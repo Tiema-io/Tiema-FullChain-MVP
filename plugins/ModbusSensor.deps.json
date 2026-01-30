@@ -1,0 +1,55 @@
+{
+  "runtimeTarget": {
+    "name": ".NETCoreApp,Version=v10.0",
+    "signature": ""
+  },
+  "compilationOptions": {},
+  "targets": {
+    ".NETCoreApp,Version=v10.0": {
+      "ModbusSensor/1.0.0": {
+        "dependencies": {
+          "Tiema.Plugin.Sdk": "1.0.0"
+        },
+        "runtime": {
+          "ModbusSensor.dll": {}
+        }
+      },
+      "Tiema.Abstractions/1.0.0": {
+        "runtime": {
+          "Tiema.Abstractions.dll": {
+            "assemblyVersion": "1.0.0.0",
+            "fileVersion": "1.0.0.0"
+          }
+        }
+      },
+      "Tiema.Plugin.Sdk/1.0.0": {
+        "dependencies": {
+          "Tiema.Abstractions": "1.0.0"
+        },
+        "runtime": {
+          "Tiema.Plugin.Sdk.dll": {
+            "assemblyVersion": "1.0.0.0",
+            "fileVersion": "1.0.0.0"
+          }
+        }
+      }
+    }
+  },
+  "libraries": {
+    "ModbusSensor/1.0.0": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "Tiema.Abstractions/1.0.0": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "Tiema.Plugin.Sdk/1.0.0": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    }
+  }
+}

@@ -6,10 +6,9 @@ using System.Text;
 namespace Tiema.Abstractions
 {
     // PluginContext.cs - 插件上下文
-    public interface IPluginContext
+    public interface IPluginContext:ICycleContext
     {
-        IPluginContainer Container { get; }
-        ITagService Tags { get; }
-        IMessageService Messages { get; }
+     
+
     }
 }

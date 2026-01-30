@@ -1,40 +1,60 @@
 ﻿using System;
 using Tiema.Abstractions;
 
-
 namespace SimpleAlarm
 {
-  
-    // 3. 报警插件
+    /// <summary>
+    /// 报警插件：订阅高温报警并记录/标记告警状态。
+    /// Alarm plugin: subscribes to high-temperature alarms and records/flags alarm state.
+    /// </summary>
     public class SimpleAlarmPlugin : PluginBase
     {
+        /// <summary>
+        /// 插件名称 / Plugin name
+        /// </summary>
         public override string Name => "SimpleAlarm";
 
-        public override void Initialize(IPluginContext context)
+        /// <summary>
+        /// 插件初始化钩子：在此处订阅消息或完成其它一次性初始化工作。
+        /// Plugin initialization hook: subscribe to messages or perform one-time setup here.
+        /// </summary>
+        protected override void OnInitialize()
         {
-            base.Initialize(context);
+            base.OnInitialize();
 
-            // 订阅报警消息
-            //OnHighTemperature会被回调
-            context.Messages.Subscribe("alarm.high_temperature", OnHighTemperature);
+            // 订阅报警消息：当有高温报警时会回调 OnHighTemperature
+            // Subscribe to alarm messages: OnHighTemperature will be called on alarm.
+            Context.Messages.Subscribe("alarm.high_temperature", OnHighTemperature);
         }
 
+        /// <summary>
+        /// 高温报警回调：接收到报警后记录日志并在 Tag 系统中标记活动告警与最后一条消息。
+        /// High-temperature alarm callback: logs the alarm and marks active alarm / last message in Tag system.
+        /// </summary>
+        /// <param name="message">来自消息系统的载荷 / payload from message system</param>
         private void OnHighTemperature(object message)
         {
-            Console.WriteLine($"[{Name}] 🚨 接收到高温报警!");
+            Console.WriteLine($"[{Name}] 🚨 接收到高温报警! / Received high-temperature alarm!");
 
-            // 这里可以：发邮件、发短信、控制设备等
-            // MVP中只打印日志
+            // 在实际场景这里可以扩展为发送通知（邮件/短信）或控制设备
+            // In real scenarios this can be extended to send notifications (email/SMS) or control devices.
 
-            // 写入Tag系统
+            // 写入 Tag 系统：标记为有活动告警并保存最后一条消息
+            // Write to Tag system: flag active alarm and save last message.
             Context.Tags.SetTag("Alarms/Active", true);
             Context.Tags.SetTag("Alarms/LastMessage", message);
         }
 
-        public override void Execute(ICycleContext context)
+        /// <summary>
+        /// 执行周期逻辑：每个周期检查告警状态并输出提示。
+        /// Periodic execution logic: check alarm state each cycle and print a warning if active.
+        /// </summary>
+        public override void Execute()
         {
-            // 每个周期检查报警状态
+            // 从 Tag 系统读取告警状态（若不存在默认返回 false）
+            // Read alarm state from Tag system (defaults to false if missing).
             var hasAlarm = Context.Tags.GetTag<bool>("Alarms/Active");
+
             if (hasAlarm)
             {
                 Console.WriteLine($"[{Name}]: warning  Alarms/Active=true");

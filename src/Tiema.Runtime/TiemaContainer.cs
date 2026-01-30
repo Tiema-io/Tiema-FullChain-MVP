@@ -5,7 +5,7 @@ using System.Xml.Linq;
 using Tiema.Abstractions;
 using Tiema.Runtime.Models;
 using Tiema.Runtime.Services;
-using Tiema.Runtime.Tiema.Runtime;
+
 
 namespace Tiema.Runtime
 {
@@ -77,23 +77,23 @@ namespace Tiema.Runtime
                         // 初始化插件
                         plugin.Initialize(pluginContext);
 
-                        Console.WriteLine($"已加载插件: {plugin.Name} ({pluginId})");
+                        Console.WriteLine($"plugin loaded: {plugin.Name} ({pluginId})");
                     }
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine(ex+ $",加载插件失败: {pluginConfig.Name}, 路径: {pluginConfig.Path}");
+                    Console.WriteLine(ex+ $",plugin load failed: {pluginConfig.Name}, 路径: {pluginConfig.Path}");
                 }
             }
 
-            Console.WriteLine($"共加载 {_plugins.Count} 个插件");
+            Console.WriteLine($"total {_plugins.Count} plugins");
 
 
         }
 
         public void Run()
         {
-            Console.WriteLine($"开始运行，周期: {_config.Container.ScanIntervalMs}ms");
+            Console.WriteLine($"start running: {_config.Container.ScanIntervalMs}ms");
 
             // 初始化所有插件
             // 修改 Run 方法中的插件遍历方式
@@ -114,7 +114,7 @@ namespace Tiema.Runtime
                 {
                     try
                     {
-                        plugin.Execute(new DefaultCycleContext(_tagService,_messageService));
+                        plugin.Execute();
                     }
                     catch (Exception ex)
                     {
@@ -135,7 +135,7 @@ namespace Tiema.Runtime
                 // 每100周期输出状态
                 if (cycleCount % 100 == 0)
                 {
-                    Console.WriteLine($"已运行 {cycleCount} 个周期");
+                    Console.WriteLine($"  {cycleCount} ");
                 }
             }
         }

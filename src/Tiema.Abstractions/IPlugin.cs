@@ -12,7 +12,7 @@ namespace Tiema.Abstractions
 
         void Initialize(IPluginContext context);
 
-        void Execute(ICycleContext context);
+        void Execute();
 
     }
 
