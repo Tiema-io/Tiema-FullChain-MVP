@@ -25,6 +25,7 @@ Simple AlarmSubscriber插件，接收报警信息并打印到控制台
 
  2. Container Engine Basics / 容器引擎基础   
 
+ 3. rack and module added  / 增加了机架和模块功能
 
 (Next 下一步 )
 

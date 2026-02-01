@@ -9,7 +9,10 @@ namespace ModbusSensor
     /// 模拟 Modbus 传感器插件：在内部循环中周期性生成温度并写入 Tag 系统。
     /// Simulated Modbus sensor plugin: periodically generates temperature and writes to Tag system in internal loop.
     /// </summary>
-    public class ModbusSensorPlugin : PluginBase
+
+
+
+    public class ModbusSensorPlugin : ModuleBase
     {
         public override string Name => "ModbusSensor";
 

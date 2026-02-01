@@ -11,8 +11,8 @@
     <Project Path="src/Tiema.Plugin.Sdk/Tiema.Plugin.Sdk.csproj" />
     <Project Path="src/Tiema.Runtime/Tiema.Runtime.csproj" />
   </Folder>
-  <Folder Name="/src/Demo.Plugins/">
-    <Project Path="plugins/CpuLogicPlugin/CpuLogicPlugin.csproj" Id="2393947d-3e90-442f-97b7-cbfba61ebc90" />
+  <Folder Name="/src/Demo.Modules/">
+    <Project Path="src/Demo.Plugins/LedSimulator/LedSimulator.csproj" Id="4ce2de81-f49d-44ee-96d3-249b51324e41" />
     <Project Path="src/Demo.Plugins/ModbusSensor/ModbusSensor.csproj" />
     <Project Path="src/Demo.Plugins/SimpleAlarm/SimpleAlarm.csproj" />
     <Project Path="src/Demo.Plugins/TemperatureLogic/TemperatureLogic.csproj" />

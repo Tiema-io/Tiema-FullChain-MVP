@@ -8,11 +8,8 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <None Include="ModbusSensorModule.cs" />
+    <ProjectReference Include="..\..\Tiema.Abstractions\Tiema.Abstractions.csproj" />
+    <ProjectReference Include="..\..\Tiema.Runtime\Tiema.Runtime.csproj" />
   </ItemGroup>
-
-  <ItemGroup>
-    <ProjectReference Include="..\..\Tiema.Plugin.Sdk\Tiema.Plugin.Sdk.csproj" />
-  </ItemGroup>
-
+	
 </Project>

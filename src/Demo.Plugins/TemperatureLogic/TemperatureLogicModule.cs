@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Threading.Tasks;
 using Tiema.Abstractions;
 
 namespace TemperatureLogic
@@ -7,7 +8,7 @@ namespace TemperatureLogic
     /// 逻辑处理插件：读取温度并在超限时发布高温报警消息（在内部循环中运行）。
     /// Logic processing plugin: reads temperature and publishes high-temp alarm when threshold exceeded (runs in internal loop).
     /// </summary>
-    public class TemperatureLogicPlugin : PluginBase
+    public class TemperatureLogicModule : ModuleBase
     {
         /// <summary>
         /// 插件名称 / Plugin name
@@ -60,6 +61,16 @@ namespace TemperatureLogic
                 // 控制台输出用于演示与调试
                 // Console output for demo and debugging
                 Console.WriteLine($"[{Name}] ⚠️ 高温报警: {temperature}°C > {ALARM_THRESHOLD}°C / High temp alarm: {temperature}°C > {ALARM_THRESHOLD}°C");
+
+                var indicator = Context.Services.GetBySlotName<IIndicatorService>(CurrentSlot.Rack.Name, "LedSlot3", "device.output.indicator.led");
+                if (indicator != null)
+                {
+                    indicator.TurnOnAsync().Wait();
+                    Task.Delay(500).ContinueWith(_ => indicator.TurnOffAsync().Wait());
+                }
+                else
+                {
+                    Console.WriteLine("[TemperatureLogic] 未找到指示灯服务 / Indicator service not found");                }
             }
         }
     }
