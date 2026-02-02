@@ -1,5 +1,6 @@
 ﻿using System;
-using Tiema.Abstractions;
+using Tiema.Sdk;
+
 
 namespace SimpleAlarm
 {
@@ -25,6 +26,10 @@ namespace SimpleAlarm
             // 订阅报警消息：当有高温报警时会回调 OnHighTemperature
             // Subscribe to alarm messages: OnHighTemperature will be called on alarm.
             Context.Messages.Subscribe("alarm.high_temperature", OnHighTemperature);
+
+            // 声明本模块将生产的 Tag（避免 SetTag 时未注册）
+            Context.Tags.DeclareProducer("Alarms/Active");
+            Context.Tags.DeclareProducer("Alarms/LastMessage");
         }
 
         /// <summary>

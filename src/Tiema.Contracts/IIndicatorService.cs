@@ -2,7 +2,7 @@ using System;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace Tiema.Abstractions
+namespace Tiema.Contracts
 {
     /// <summary>
     /// 输出指示器服务（例如面板指示灯、继电器等）。

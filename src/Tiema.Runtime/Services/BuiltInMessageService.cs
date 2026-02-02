@@ -1,7 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Text;
-using Tiema.Abstractions;
+
+using Tiema.Contracts;
 
 namespace Tiema.Runtime.Services
 {

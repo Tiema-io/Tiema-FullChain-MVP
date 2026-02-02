@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace Tiema.Abstractions
+namespace Tiema.Contracts
 {
     /// <summary>
     /// 插件接口：唯一的初始化入口（Initialize），以及宿主可控制的生命周期方法 Start/Stop。
@@ -42,6 +42,10 @@ namespace Tiema.Abstractions
         // 
         void OnPlugged(ISlot slot);
         void OnUnplugged();
+
+
+ 
+
     }
 
 

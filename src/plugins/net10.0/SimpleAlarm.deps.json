@@ -8,26 +8,26 @@
     ".NETCoreApp,Version=v10.0": {
       "SimpleAlarm/1.0.0": {
         "dependencies": {
-          "Tiema.Plugin.Sdk": "1.0.0"
+          "Tiema.Sdk": "1.0.0"
         },
         "runtime": {
           "SimpleAlarm.dll": {}
         }
       },
-      "Tiema.Abstractions/1.0.0": {
+      "Tiema.Contracts/1.0.0": {
         "runtime": {
-          "Tiema.Abstractions.dll": {
+          "Tiema.Contracts.dll": {
             "assemblyVersion": "1.0.0.0",
             "fileVersion": "1.0.0.0"
           }
         }
       },
-      "Tiema.Plugin.Sdk/1.0.0": {
+      "Tiema.Sdk/1.0.0": {
         "dependencies": {
-          "Tiema.Abstractions": "1.0.0"
+          "Tiema.Contracts": "1.0.0"
         },
         "runtime": {
-          "Tiema.Plugin.Sdk.dll": {
+          "Tiema.Sdk.dll": {
             "assemblyVersion": "1.0.0.0",
             "fileVersion": "1.0.0.0"
           }
@@ -41,12 +41,12 @@
       "serviceable": false,
       "sha512": ""
     },
-    "Tiema.Abstractions/1.0.0": {
+    "Tiema.Contracts/1.0.0": {
       "type": "project",
       "serviceable": false,
       "sha512": ""
     },
-    "Tiema.Plugin.Sdk/1.0.0": {
+    "Tiema.Sdk/1.0.0": {
       "type": "project",
       "serviceable": false,
       "sha512": ""

@@ -1,8 +1,8 @@
 ﻿//Tiema.Runtime/Program.cs 
 using System;
+using System.IO;
 using System.Text.Json;
 using Tiema.Runtime.Models;
-using Tiema.Runtime.Services;
 
 namespace Tiema.Runtime
 {
@@ -10,28 +10,33 @@ namespace Tiema.Runtime
     /// 程序入口：负责启动 Tiema 容器并运行。
     /// Program entry: responsible for creating and running the Tiema container.
     /// </summary>
-    public static class Program
+    internal static class Program
     {
         /// <summary>
         /// 应用程序入口点（常见签名）。
         /// Application entry point (common signature).
         /// </summary>
         /// <param name="args">命令行参数 / command-line arguments</param>
-        public static void Main(string[] args)
+        private static void Main(string[] args)
         {
-            Console.WriteLine("=== Tiema Runtime v0.1 ====");
+            Console.WriteLine("=== Tiema Runtime v0.1 ===");
 
             try
             {
-                var config = Utility.LoadConfiguration("tiema.config.json");
-                var container = new TiemaContainer(config, new BuiltInTagService(), new BuiltInMessageService());
+                var configPath = Path.Combine(AppContext.BaseDirectory, "tiema.config.json");
+                var json = File.ReadAllText(configPath);
+                var config = JsonSerializer.Deserialize<TiemaConfig>(json)
+                             ?? throw new InvalidOperationException("Failed to load tiema.config.json");
 
+                // 使用最小版 HostBuilder 创建 TiemaHost
+                // Use minimal HostBuilder to create TiemaHost.
+                var host = TiemaHostBuilder
+                    .Create(config)
+                    // 当前使用默认实现，不额外调用 UseXXX
+                    .Build();
 
-                // 根据配置批量加载模块（会自动尝试将模块插入到配置指定的 rack/slot）
-                container.LoadModules();
-
-                // 运行并阻塞直到 Stop() 被调用（或 Ctrl+C）
-                container.Run();
+                host.LoadModules();
+                host.Run();
             }
             catch (Exception ex)
             {

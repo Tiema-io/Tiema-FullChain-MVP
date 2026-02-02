@@ -2,8 +2,9 @@
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using System.Text;
+using Tiema.Contracts;
 
-namespace Tiema.Abstractions
+namespace Tiema.Hosting.Abstractions
 {
     public interface ISlotManager
     {

@@ -3,14 +3,14 @@ using System.Collections.Generic;
 using System.Text;
 
 
-namespace Tiema.Abstractions
+namespace Tiema.Contracts
 {
     // PluginContext.cs - 插件上下文
     public interface IModuleContext
     {
-        IRackManager Racks { get; }
+     
         ISlot CurrentSlot { get; }
-        IRack CurrentRack => CurrentSlot?.Rack;
+     
 
         /// <summary>
         /// 统一的服务注册/发现入口（宿主提供的单一 Registry）

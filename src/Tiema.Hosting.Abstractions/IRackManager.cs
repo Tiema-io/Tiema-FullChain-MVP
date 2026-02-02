@@ -2,7 +2,9 @@
 using System.Collections.Generic;
 using System.Text;
 
-namespace Tiema.Abstractions
+using Tiema.Contracts;
+
+namespace Tiema.Hosting.Abstractions
 {
     public interface IRackManager
     {

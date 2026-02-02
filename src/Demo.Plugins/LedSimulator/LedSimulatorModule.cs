@@ -1,7 +1,9 @@
 ﻿using System;
 using System.Threading;
 using System.Threading.Tasks;
-using Tiema.Abstractions;
+using Tiema.Contracts;
+using Tiema.Sdk;
+
 
 namespace LedSimulator
 {

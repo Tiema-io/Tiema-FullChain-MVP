@@ -1,7 +1,8 @@
 using System;
 using System.Collections.Generic;
+using Tiema.Contracts;
 
-namespace Tiema.Abstractions
+namespace Tiema.Hosting.Abstractions
 {
     /// <summary>
     /// 平台宿主 / Module host
@@ -37,16 +38,5 @@ namespace Tiema.Abstractions
         /// </summary>
         IServiceRegistry Services { get; }
 
-        /// <summary>
-        /// Tag 系统服务（用于模块间数据交换）。
-        /// Tag service for inter-module data exchange.
-        /// </summary>
-        ITagService Tags { get; }
-
-        /// <summary>
-        /// 消息发布/订阅服务（用于模块间通信）。
-        /// Message pub/sub service for inter-module communication.
-        /// </summary>
-        IMessageService Messages { get; }
     }
 }

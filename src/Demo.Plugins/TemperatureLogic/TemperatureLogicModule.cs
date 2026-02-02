@@ -1,6 +1,8 @@
 ﻿using System;
 using System.Threading.Tasks;
-using Tiema.Abstractions;
+using Tiema.Contracts;
+using Tiema.Sdk;
+
 
 namespace TemperatureLogic
 {
@@ -34,7 +36,25 @@ namespace TemperatureLogic
         protected override void OnInitialize()
         {
             base.OnInitialize();
-            // 可读取配置
+            // 声明 Consumer Tag 并订阅更新。
+            // Declare consumer tag and subscribe to updates.
+            Context.Tags.DeclareConsumer("Plant/Temperature");
+            _subscription = Context.Tags.SubscribeTag("Plant/Temperature", OnTemperatureUpdated);
+        }
+
+        private IDisposable _subscription;
+
+        private void OnTemperatureUpdated(object value)
+        {
+            if (value is int temp)
+            {
+                Console.WriteLine($"[{Name}] 自动接收温度: {temp}°C / Auto-received temperature: {temp}°C");
+                if (temp > ALARM_THRESHOLD)
+                {
+                    Context.Messages.Publish("alarm.high_temperature", new { Temperature = temp, Threshold = ALARM_THRESHOLD });
+                    Console.WriteLine($"[{Name}] ⚠️ 高温报警: {temp}°C > {ALARM_THRESHOLD}°C");
+                }
+            }
         }
 
         /// <summary>
@@ -43,35 +63,18 @@ namespace TemperatureLogic
         /// </summary>
         protected override void Execute()
         {
-            // 从 Tag 系统读取温度（示例 key: "Plant/Temperature"）
-            // Read temperature from Tag system (example key: "Plant/Temperature")
-            var temperature = Context.Tags.GetTag<int>("Plant/Temperature");
+            // 不再需要手动 GetTag，数据通过订阅自动推送。
+            // No longer need manual GetTag; data is pushed via subscription.
+        }
 
-            // 判断是否超过阈值，超过则发布高温报警消息，订阅了 "alarm.high_temperature" 的插件将被通知
-            // Check threshold and publish high-temperature alarm message; plugins subscribed to "alarm.high_temperature" will be notified.
-            if (temperature > ALARM_THRESHOLD)
-            {
-                Context.Messages.Publish("alarm.high_temperature", new
-                {
-                    Temperature = temperature,
-                    Threshold = ALARM_THRESHOLD,
-                    Message = "温度超限! / Temperature exceeded!"
-                });
-
-                // 控制台输出用于演示与调试
-                // Console output for demo and debugging
-                Console.WriteLine($"[{Name}] ⚠️ 高温报警: {temperature}°C > {ALARM_THRESHOLD}°C / High temp alarm: {temperature}°C > {ALARM_THRESHOLD}°C");
-
-                var indicator = Context.Services.GetBySlotName<IIndicatorService>(CurrentSlot.Rack.Name, "LedSlot3", "device.output.indicator.led");
-                if (indicator != null)
-                {
-                    indicator.TurnOnAsync().Wait();
-                    Task.Delay(500).ContinueWith(_ => indicator.TurnOffAsync().Wait());
-                }
-                else
-                {
-                    Console.WriteLine("[TemperatureLogic] 未找到指示灯服务 / Indicator service not found");                }
-            }
+        /// <summary>
+        /// 停止逻辑，插件卸载时调用。
+        /// Stop logic, called when the plugin is unloaded.
+        /// </summary>
+        protected override void OnStop()
+        {
+            base.OnStop();
+            _subscription?.Dispose();
         }
     }
 }

@@ -9,7 +9,19 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Tiema.Abstractions\Tiema.Abstractions.csproj" />
+    <PackageReference Include="Google.Protobuf" Version="3.34.0-rc1" />
+    <PackageReference Include="Grpc.Core" Version="2.46.6" />
+    <PackageReference Include="Grpc.Net.Client" Version="2.76.0" />
+    <PackageReference Include="Grpc.Tools" Version="2.76.0">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Tiema.Contracts\Tiema.Contracts.csproj" />
+    <ProjectReference Include="..\Tiema.Hosting.Abstractions\Tiema.Hosting.Abstractions.csproj" />
+    <ProjectReference Include="..\Tiema.Plugin.Sdk\Tiema.Sdk.csproj" />
   </ItemGroup>
 
   <ItemGroup>
@@ -17,5 +29,9 @@
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
   </ItemGroup>
+
+	<ItemGroup>
+		<Protobuf Include="protos/*.proto" GrpcServices="Both" />
+	</ItemGroup>
 
 </Project>

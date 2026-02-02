@@ -3,7 +3,8 @@ using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Runtime.Loader;
-using Tiema.Abstractions;
+using Tiema.Contracts;
+
 
 namespace Tiema.Runtime
 {

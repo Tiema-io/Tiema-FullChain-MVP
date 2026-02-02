@@ -7,8 +7,10 @@
     <File Path="scripts/build.ps1" />
   </Folder>
   <Folder Name="/src/">
-    <Project Path="src/Tiema.Abstractions/Tiema.Abstractions.csproj" />
-    <Project Path="src/Tiema.Plugin.Sdk/Tiema.Plugin.Sdk.csproj" />
+    <Project Path="src/Tiema.Contracts/Tiema.Contracts.csproj" />
+    <Project Path="src/Tiema.Hosting.Abstractions/Tiema.Hosting.Abstractions.csproj" Id="cb068cb6-dc56-47a2-99c4-3381b2697e57" />
+    <Project Path="src/Tiema.Plugin.Sdk/Tiema.Sdk.csproj" />
+    <Project Path="src/Tiema.Runtime.Tests/Tiema.Runtime.Tests.csproj" Id="f39c9c64-04c0-4743-8962-9d24aca82b0c" />
     <Project Path="src/Tiema.Runtime/Tiema.Runtime.csproj" />
   </Folder>
   <Folder Name="/src/Demo.Modules/">

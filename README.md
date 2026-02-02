@@ -27,11 +27,13 @@ Simple AlarmSubscriber插件，接收报警信息并打印到控制台
 
  3. rack and module added  / 增加了机架和模块功能
 
+4.  Tag System Implementation / Tag系统实现
+
 (Next 下一步 )
 
 [] Backplane Routing Implementation / Backplane路由实现  
 
-[] Tag System Implementation / Tag系统实现
+
 
 [] Inter-Plugin Data Flow Verification / 插件间数据流验证
 

@@ -4,142 +4,81 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading;
-using Tiema.Abstractions;
+
+using Tiema.Contracts;
+using Tiema.Hosting.Abstractions;
 using Tiema.Runtime.Models;
 using Tiema.Runtime.Services;
 
 namespace Tiema.Runtime
 {
     /// <summary>
-    /// Tiema 容器：运行时主体，管理机架/插槽/模块与统一 ServiceRegistry。
-    /// Tiema container: core runtime hosting racks/slots/modules and unified service registry.
+    /// TiemaHost: core runtime hosting racks/slots/modules and unified service registry.
     /// </summary>
-    public class TiemaContainer : IModuleHost
+    public class TiemaHost : IModuleHost
     {
-        private readonly Dictionary<string, ModuleEntry> _modules = new();
+        private readonly Dictionary<string, HostedModule> _modules = new();
         private readonly CancellationTokenSource _cts = new();
         private readonly TiemaConfig _config;
 
-        private readonly ITagService _tag_service;
-        private readonly IMessageService _message_service;
-
         // 机架管理器与插槽管理器（内存实现）
         // rack manager and slot manager (in-memory)
-        private readonly IRackManager _rackManager = new InMemoryRackManager();
+        private readonly IRackManager _rackManager;
         private readonly ISlotManager _slotManager;
+
         // 统一的宿主级 ServiceRegistry（注入 rackManager 以支持按 slot name 查找）
         // unified host-level service registry (injected with rackManager to resolve slot name)
-        private readonly IServiceRegistry _serviceRegistry;
+        private readonly SimpleServiceRegistry _services;
 
-        public TiemaContainer(
+        // 核心运行时服务：Tag / Message / Registration / Backplane
+        // Core runtime services: Tag / Message / Registration / Backplane
+        private readonly ITagRegistrationManager _tagRegistrationManager;
+        private readonly IBackplane _backplane;
+        private readonly ITagService _tagService;
+        private readonly IMessageService _messageService;
+
+        // 只允许 TiemaHostBuilder 调用的内部构造函数
+        // Internal ctor used only by TiemaHostBuilder.
+        internal TiemaHost(
             TiemaConfig config,
+            IRackManager rackManager,
+            ISlotManager slotManager,
+            SimpleServiceRegistry services,
+            ITagRegistrationManager tagRegistrationManager,
+            IBackplane backplane,
             ITagService tagService,
             IMessageService messageService)
         {
             _config = config ?? throw new ArgumentNullException(nameof(config));
-            _tag_service = tagService ?? throw new ArgumentNullException(nameof(tagService));
-            _message_service = messageService ?? throw new ArgumentNullException(nameof(messageService));
 
-            _slotManager = new InMemorySlotManager(_rackManager);
+            _rackManager = rackManager ?? throw new ArgumentNullException(nameof(rackManager));
+            _slotManager = slotManager ?? throw new ArgumentNullException(nameof(slotManager));
+            _services    = services ?? throw new ArgumentNullException(nameof(services));
 
-            // 使用能按 slotName 映射的 registry 实现（便于兼容 name 查询）
-            // Use registry that can resolve slotName -> slotId for convenience lookups
-            _serviceRegistry = new SimpleServiceRegistry(_rackManager);
+            _tagRegistrationManager = tagRegistrationManager ?? throw new ArgumentNullException(nameof(tagRegistrationManager));
+            _backplane              = backplane ?? throw new ArgumentNullException(nameof(backplane));
+            _tagService             = tagService ?? throw new ArgumentNullException(nameof(tagService));
+            _messageService         = messageService ?? throw new ArgumentNullException(nameof(messageService));
 
-            // 从配置预建机架与插槽，并把 slot 参数注册到 registry（使用 slot.Id）
-            // Pre-create racks/slots from config and register slot parameters into registry (using slot.Id)
+            // 根据配置初始化机架与插槽，并注册 slot 参数
             InitializeRacksFromConfig();
         }
 
-        public ITagService Tags => _tag_service;
-        public IMessageService Messages => _message_service;
         public IRackManager Racks => _rackManager;
         public ISlotManager Slots => _slotManager;
-        public IServiceRegistry Services => _serviceRegistry;
+        public IServiceRegistry Services => _services;
 
         // 内部类型：模块条目封装模块实例与其上下文
-        private class ModuleEntry
+        private class HostedModule
         {
             public IModule Module { get; }
             public DefaultModuleContext Context { get; }
 
-            public ModuleEntry(IModule module, DefaultModuleContext context)
+            public HostedModule(IModule module, DefaultModuleContext context)
             {
                 Module = module;
                 Context = context;
             }
-        }
-
-        // 简单的内存机架管理器（按名称存放机架）
-        private class InMemoryRackManager : IRackManager
-        {
-            private readonly Dictionary<string, IRack> _racks = new(StringComparer.OrdinalIgnoreCase);
-
-            public IRack CreateRack(string name, int slotCount)
-            {
-                if (_racks.ContainsKey(name)) return _racks[name];
-                var r = new SimpleRack(name, slotCount);
-                _racks[name] = r;
-                return r;
-            }
-
-            public IRack GetRack(string name) => _racks.TryGetValue(name, out var r) ? r : null;
-
-            public IEnumerable<IRack> AllRacks => _racks.Values;
-        }
-
-        // 插槽管理器：路径格式 "rackName/slotName"（不再默认使用 index）
-        private class InMemorySlotManager : ISlotManager
-        {
-            private readonly IRackManager _rackManager;
-
-            public InMemorySlotManager(IRackManager rackManager)
-            {
-                _rackManager = rackManager;
-            }
-
-            /// <summary>
-            /// 通过路径获取插槽，路径格式为 "rackName/slotName"。
-            /// 若 createIfNotExist 为 true 且 rack 为 SimpleRack，实现会尝试创建名为 slotName 的插槽。
-            /// Path format: "rackName/slotName". If createIfNotExist and rack is SimpleRack, attempt to create named slot.
-            /// </summary>
-            public ISlot GetSlot(string path, bool createIfNotExist = false)
-            {
-                if (string.IsNullOrEmpty(path)) return null;
-
-                var parts = path.Split('/', StringSplitOptions.RemoveEmptyEntries);
-                var rackName = parts[0];
-                var slotName = parts.Length > 1 ? parts[1] : null;
-
-                var rack = _rackManager.GetRack(rackName);
-                if (rack == null)
-                {
-                    if (!createIfNotExist) return null;
-                    // 如果机架不存在，创建一个最小机架
-                    rack = _rackManager.CreateRack(rackName, 1);
-                }
-
-                ISlot slot = null;
-                if (!string.IsNullOrEmpty(slotName))
-                {
-                    slot = rack.GetSlot(slotName);
-                }
-
-                // 若需要创建并且还未找到，则尝试在 SimpleRack 上创建
-                if (slot == null && createIfNotExist && !string.IsNullOrEmpty(slotName))
-                {
-                    if (rack is SimpleRack sr)
-                    {
-                        // 使用当前槽数作为新槽的顺序位置（仅用于创建，Id/Name 由 SimpleSlot 管理）
-                        var insertIndex = sr.AllSlots.Count();
-                        slot = sr.CreateSlot(insertIndex, slotName, rack);
-                    }
-                }
-
-                return slot;
-            }
-
-            public IReadOnlyList<ISlot> AllSlots => _rackManager.AllRacks.SelectMany(r => r.AllSlots).ToList();
         }
 
         private void InitializeRacksFromConfig()
@@ -215,7 +154,7 @@ namespace Tiema.Runtime
                                     {
                                         var sid = (slot as SimpleSlot)?.Id ?? -1;
                                         if (sid >= 0)
-                                            _serviceRegistry.Register(rackCfg.Name, sid, kv.Key, kv.Value ?? string.Empty);
+                                            _services.Register(rackCfg.Name, sid, kv.Key, kv.Value ?? string.Empty);
                                     }
                                     catch (Exception ex)
                                     {
@@ -228,7 +167,7 @@ namespace Tiema.Runtime
                             {
                                 var sid = (slot as SimpleSlot)?.Id ?? -1;
                                 if (sid >= 0)
-                                    _serviceRegistry.Register(rackCfg.Name, sid, "slot.name", slot.Name);
+                                    _services.Register(rackCfg.Name, sid, "slot.name", slot.Name);
                             }
                             catch { /* ignore */ }
                         }
@@ -246,7 +185,7 @@ namespace Tiema.Runtime
 
                                 try
                                 {
-                                    _serviceRegistry.Register(rackCfg.Name, (slot as SimpleSlot)?.Id ?? -1, "slot.name", defaultName);
+                                    _services.Register(rackCfg.Name, (slot as SimpleSlot)?.Id ?? -1, "slot.name", defaultName);
                                 }
                                 catch { }
                             }
@@ -261,7 +200,7 @@ namespace Tiema.Runtime
                                 if (slot == null) continue;
                                 try
                                 {
-                                    _serviceRegistry.Register(rackCfg.Name, (slot as SimpleSlot)?.Id ?? -1, "slot.name", defaultName);
+                                    _services.Register(rackCfg.Name, (slot as SimpleSlot)?.Id ?? -1, "slot.name", defaultName);
                                 }
                                 catch { }
                             }
@@ -428,12 +367,43 @@ namespace Tiema.Runtime
                     return string.Empty;
                 }
 
-                var moduleContext = new DefaultModuleContext(this);
-
+                // 先生成 moduleId，再构造 DefaultModuleContext（新的构造函数需要 moduleInstanceId）
                 var moduleId = $"{moduleInstance.Name}_{Guid.NewGuid():N}".Substring(0, 20);
-                _modules[moduleId] = new ModuleEntry(moduleInstance, moduleContext);
+                var moduleContext = new DefaultModuleContext(this, moduleId, _tagService, _messageService, _services);
 
+                // 保存模块条目（保证在 Initialize/Declare 时能通过 moduleId 找到上下文/状态）
+                _modules[moduleId] = new HostedModule(moduleInstance, moduleContext);
+
+                // 调用模块初始化（模块的 DeclareProducer/DeclareConsumer 会通过 Context 立即注册）
                 moduleInstance.Initialize(moduleContext);
+
+                // 主机级别的补注册（幂等）：收集模块在初始化期间声明的 tags 并再次调用注册器
+                // 这样在模块可能未显式声明某些 tag 时仍能保证注册完毕（与 ModuleScoped 注册互补，且安全）
+                if (_tagService is BuiltInTagService builtInTagService)
+                {
+                    Console.WriteLine($"[DEBUG] Registering tags for module {moduleId}: Producers={string.Join(",", builtInTagService.GetDeclaredProducers())}, Consumers={string.Join(",", builtInTagService.GetDeclaredConsumers())}");
+                    var identities = _tagRegistrationManager.RegisterModuleTags(
+                        moduleId,
+                        builtInTagService.GetDeclaredProducers(),
+                        builtInTagService.GetDeclaredConsumers());
+
+                    foreach (var identity in identities)
+                    {
+                        Console.WriteLine($"[DEBUG] Registered Tag: {identity.Path} (Handle: {identity.Handle}, Role: {identity.Role}) for module {moduleId}");
+                    }
+
+                    // 通知 BuiltInTagService 注册完成，以便它可为本地声明的 consumer 建立 backplane 订阅
+                    try
+                    {
+                        builtInTagService.OnTagsRegistered(identities);
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"[WARN] OnTagsRegistered failed: {ex.Message}");
+                    }
+                }
+
+                // 启动模块（Start 可能会立即进入 Execute 循环）
                 moduleInstance.Start();
 
                 return moduleId;

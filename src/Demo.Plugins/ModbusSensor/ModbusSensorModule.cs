@@ -1,7 +1,8 @@
 ﻿using System;
 using System.Threading;
 using System.Threading.Tasks;
-using Tiema.Abstractions;
+using Tiema.Sdk;
+
 
 namespace ModbusSensor
 {
@@ -23,7 +24,9 @@ namespace ModbusSensor
         protected override void OnInitialize()
         {
             base.OnInitialize();
-            // 可读取配置等
+            // 声明 Producer Tag。
+            // Declare producer tag.
+            Context.Tags.DeclareProducer("Plant/Temperature");
         }
 
         protected override void OnStart()

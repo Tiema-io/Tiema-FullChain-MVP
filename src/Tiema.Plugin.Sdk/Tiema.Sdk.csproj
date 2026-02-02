@@ -4,11 +4,12 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-	  <OutputPath>../../plugins/</OutputPath>
+	 
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\Tiema.Plugin.Sdk\Tiema.Sdk.csproj" />
+   
+    <ProjectReference Include="..\Tiema.Contracts\Tiema.Contracts.csproj" />
   </ItemGroup>
-	
+
 </Project>

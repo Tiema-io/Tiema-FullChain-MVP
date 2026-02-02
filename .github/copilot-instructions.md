@@ -2,6 +2,9 @@
 
 ## General Guidelines
 - Use bilingual Chinese-English comments in code and explanations by default.
+- Tiema 核心（runtime）不应引用 SDK，SDK 仅供插件使用。
+- 默认情况下，在提供代码修改建议时，仅显示修改内容并提供可选的 git 提交命令或补丁；仅在明确请求时再执行或自动提交。
+- Implement single-process Tag/backplane first and avoid large expansions; prepare for cross-process (跨进程) plugin modes later, allowing the system to switch between in-process (InMemory) and distributed (gRPC) backplane modes for flexibility in debugging. **Prefer using InMemoryBackplane for debugging; switch to gRPC/remote Backplane for distributed/production.**
 
 ## Code Style
 - Follow specific formatting rules.

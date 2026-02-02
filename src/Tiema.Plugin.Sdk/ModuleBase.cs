@@ -1,8 +1,9 @@
 ﻿using System;
 using System.Threading;
 using System.Threading.Tasks;
+using Tiema.Contracts;
 
-namespace Tiema.Abstractions
+namespace Tiema.Sdk
 {
     /// <summary>
     /// 模块基类：提供 Initialize/Start/Stop 的默认实现，模块自行控制内部循环。

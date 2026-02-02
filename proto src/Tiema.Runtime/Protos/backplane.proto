@@ -1,0 +1,85 @@
+syntax = "proto3";
+
+package tiema.backplane;
+
+import "google/protobuf/any.proto";
+import "google/protobuf/timestamp.proto";
+
+// Backplane service: registration + storage + publish/subscribe
+service Backplane {
+  // Register module's producers/consumers and return assigned identities
+  rpc RegisterModuleTags(RegisterModuleTagsRequest) returns (RegisterModuleTagsResponse);
+
+  // Publish a tag update (producer -> backplane)
+  rpc Publish(PublishRequest) returns (PublishResponse);
+
+  // Get latest value for a tag handle
+  rpc GetLastValue(GetRequest) returns (GetResponse);
+
+  // Subscribe to updates for a handle. Server streaming: server pushes Update messages.
+  rpc Subscribe(SubscribeRequest) returns (stream Update);
+}
+
+// Request to register producers/consumers
+message RegisterModuleTagsRequest {
+  string moduleInstanceId = 1;
+  repeated string producerPaths = 2;
+  repeated string consumerPaths = 3;
+}
+
+// Response containing assigned identities
+message RegisterModuleTagsResponse {
+  repeated TagIdentity identities = 1;
+}
+
+// Unique tag identity mapping
+message TagIdentity {
+  uint32 handle = 1;
+  string path = 2;
+  string role = 3; // "Producer" or "Consumer"
+  string ownerModuleId = 4;
+}
+
+// Publish request
+message PublishRequest {
+  uint32 handle = 1;
+  google.protobuf.Any value = 2;
+  google.protobuf.Timestamp timestamp = 3;
+  uint32 quality = 4;
+  string sourceModuleId = 5;
+}
+
+// Publish response (ack)
+message PublishResponse {
+  bool ok = 1;
+  string error = 2;
+}
+
+// Get last value
+message GetRequest {
+  uint32 handle = 1;
+}
+
+message GetResponse {
+  google.protobuf.Any value = 1;
+  google.protobuf.Timestamp timestamp = 2;
+  uint32 quality = 3;
+  bool found = 4;
+  string error = 5;
+}
+
+// Subscribe request (client asks to subscribe to a handle)
+message SubscribeRequest {
+  uint32 handle = 1;
+  string subscriberId = 2;
+  // optional filters / qos could be added later
+}
+
+// Update streamed from server to client
+message Update {
+  uint32 handle = 1;
+  google.protobuf.Any value = 2;
+  google.protobuf.Timestamp timestamp = 3;
+  uint32 quality = 4;
+  string sourceModuleId = 5;
+}

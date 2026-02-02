@@ -12,7 +12,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\Tiema.Plugin.Sdk\Tiema.Plugin.Sdk.csproj" />
+    <ProjectReference Include="..\..\Tiema.Plugin.Sdk\Tiema.Sdk.csproj" />
   </ItemGroup>
 
 </Project>

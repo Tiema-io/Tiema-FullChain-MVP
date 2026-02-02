@@ -8,27 +8,26 @@
     ".NETCoreApp,Version=v10.0": {
       "LedSimulator/1.0.0": {
         "dependencies": {
-          "Tiema.Abstractions": "1.0.0",
-          "Tiema.Runtime": "1.0.0"
+          "Tiema.Sdk": "1.0.0"
         },
         "runtime": {
           "LedSimulator.dll": {}
         }
       },
-      "Tiema.Abstractions/1.0.0": {
+      "Tiema.Contracts/1.0.0": {
         "runtime": {
-          "Tiema.Abstractions.dll": {
+          "Tiema.Contracts.dll": {
             "assemblyVersion": "1.0.0.0",
             "fileVersion": "1.0.0.0"
           }
         }
       },
-      "Tiema.Runtime/1.0.0": {
+      "Tiema.Sdk/1.0.0": {
         "dependencies": {
-          "Tiema.Abstractions": "1.0.0"
+          "Tiema.Contracts": "1.0.0"
         },
         "runtime": {
-          "Tiema.Runtime.dll": {
+          "Tiema.Sdk.dll": {
             "assemblyVersion": "1.0.0.0",
             "fileVersion": "1.0.0.0"
           }
@@ -42,12 +41,12 @@
       "serviceable": false,
       "sha512": ""
     },
-    "Tiema.Abstractions/1.0.0": {
+    "Tiema.Contracts/1.0.0": {
       "type": "project",
       "serviceable": false,
       "sha512": ""
     },
-    "Tiema.Runtime/1.0.0": {
+    "Tiema.Sdk/1.0.0": {
       "type": "project",
       "serviceable": false,
       "sha512": ""

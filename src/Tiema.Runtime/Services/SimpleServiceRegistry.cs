@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Concurrent;
-using Tiema.Abstractions;
+using Tiema.Contracts;
+using Tiema.Hosting.Abstractions;
+
 
 namespace Tiema.Runtime.Services
 {
@@ -12,13 +14,26 @@ namespace Tiema.Runtime.Services
     /// </summary>
     public class SimpleServiceRegistry : IServiceRegistry
     {
-        private readonly ConcurrentDictionary<string, object> _map = new();
+        private readonly Dictionary<(string rackName, int slotId, string serviceName), object> _services
+          = new();
         private readonly IRackManager? _rackManager; // 可选，用于从 slotName 映射到 slotId
 
+        // 宿主级服务（不绑定具体 slot），例如 Tag、Message、Backplane、RegistrationManager 等。
+        // Host-level services (not bound to a specific slot), e.g. Tag, Message, Backplane, RegistrationManager.
+        public BuiltInTagService TagService { get; }
+        public BuiltInMessageService MessageService { get; }
+        public InMemoryBackplane Backplane { get; }
+        public InMemoryTagRegistrationManager TagRegistrationManager { get; }
+
         public SimpleServiceRegistry(IRackManager? rackManager = null)
-        {
+        {    // 初始化核心服务实例 / Initialize core services.
+          
+
             _rackManager = rackManager;
         }
+    
+
+
 
         // Key 格式："{rack}::{slotId}::{serviceName}"
         // Key format: "{rack}::{slotId}::{serviceName}"
@@ -36,7 +51,7 @@ namespace Tiema.Runtime.Services
         {
             if (serviceName == null) throw new ArgumentNullException(nameof(serviceName));
             if (implementation == null) throw new ArgumentNullException(nameof(implementation));
-            _map[Key(rackName, slotId, serviceName)] = implementation!;
+            _services[(rackName, slotId, serviceName)] = implementation!;
         }
 
         /// <summary>
@@ -50,7 +65,7 @@ namespace Tiema.Runtime.Services
         public bool Unregister(string rackName, int slotId, string serviceName)
         {
             if (serviceName == null) throw new ArgumentNullException(nameof(serviceName));
-            return _map.TryRemove(Key(rackName, slotId, serviceName), out _);
+            return _services.Remove((rackName, slotId, serviceName));
         }
 
         /// <summary>
@@ -68,7 +83,8 @@ namespace Tiema.Runtime.Services
             instance = null;
             if (serviceName == null) return false;
 
-            if (_map.TryGetValue(Key(rackName, slotId, serviceName), out var obj) && obj is T t)
+            // 修正：将 slotId 转为 string，与字典键类型一致 / Fix: convert slotId to string to match dictionary key type
+            if (_services.TryGetValue((rackName, slotId, serviceName), out var obj) && obj is T t)
             {
                 instance = t;
                 return true;
@@ -90,6 +106,12 @@ namespace Tiema.Runtime.Services
         {
             TryGet<T>(rackName, slotId, serviceName, out var inst);
             return inst;
+        }
+
+
+        public T? GetHostService<T>(string serviceName) where T : class
+        {
+            return Get<T>(string.Empty, -1, serviceName);
         }
 
         // --------------------------------------------------------------------

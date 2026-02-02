@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace Tiema.Abstractions
+namespace Tiema.Contracts
 {
     /// <summary>
     /// 统一的服务注册表（Host 级别存储）。
