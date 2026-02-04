@@ -8,6 +8,7 @@ using Grpc.Core;
 using Google.Protobuf.WellKnownTypes;
 using static Tiema.Protocols.V1.Backplane;
 using Tiema.Protocols.V1;
+using Tiema.Hosting.Abstractions;
 
 namespace Tiema.Runtime.Services
 {
@@ -21,7 +22,7 @@ namespace Tiema.Runtime.Services
         private readonly ConcurrentDictionary<uint, (Any Value, Timestamp Ts, uint Quality, string Source)> _mirror =
             new();
 
-        // path -> TagIdentity (mirrors registration)
+        // path -> TagIdentity (mirrors registration)  使用宿主抽象层的 TagIdentity
         private readonly ConcurrentDictionary<string, TagIdentity> _byPath = new(StringComparer.OrdinalIgnoreCase);
         private readonly ConcurrentDictionary<uint, TagIdentity> _byHandle = new();
 
@@ -39,74 +40,120 @@ namespace Tiema.Runtime.Services
         }
 
         /// <summary>
-        /// 注册模块声明的 producers/consumers，并返回分配到的 identities（幂等：同一路径复用 handle）。
-        /// 建议在分布式场景中把 registration 逻辑集中到此服务端以保证全局一致性。
+        /// 注册插件声明的 tags（基于 tagsystem.proto 的 RegisterTagsRequest/Response）。
+        /// - 内部保持 path -> 宿主 TagIdentity 映射；
+        /// - 返回值为 protobuf 的 RegisterTagsResponse，其中 assigned 为 RegisterTagInfo 列表。
         /// </summary>
-        public override Task<RegisterModuleTagsResponse> RegisterModuleTags(RegisterModuleTagsRequest request, ServerCallContext context)
+        public override Task<RegisterTagsResponse> RegisterTags(RegisterTagsRequest request, ServerCallContext context)
         {
-            var resp = new RegisterModuleTagsResponse();
+            var resp = new RegisterTagsResponse
+            {
+                Success = true,
+                Message = string.Empty
+            };
 
             if (request == null) return Task.FromResult(resp);
 
-            // producers
-            foreach (var path in request.ProducerPaths ?? Enumerable.Empty<string>())
+            // 如果请求里带有 tags（RegisterTagInfo），逐一处理
+            foreach (var info in request.Tags ?? Enumerable.Empty<RegisterTagInfo>())
             {
-                if (string.IsNullOrWhiteSpace(path)) continue;
-                var identity = GetOrCreateIdentity(path, "Producer", request.ModuleInstanceId);
-                resp.Identities.Add(identity);
+                if (string.IsNullOrWhiteSpace(info.TagName)) continue;
+
+                // 将 proto 的 Role 映射为宿主字符串 role（Producer/Consumer）
+                var roleStr = info.Role == TagRole.Producer ? "Producer" : "Consumer";
+
+                // 在宿主映射中创建/获取 identity
+                var identity = GetOrCreateIdentity(info.TagName, roleStr, request.PluginInstanceId);
+
+                // 把宿主身份信息映射回 protobuf 的 RegisterTagInfo 并加入响应 assigned
+                var assigned = new RegisterTagInfo
+                {
+                    SourcePluginInstanceId = identity.ModuleInstanceId,
+                    Handle = identity.Handle,
+                    TagName = identity.Path,
+                    Role = (identity.Role == TagRole.Producer) ? TagRole.Producer : TagRole.Consumer,
+                    ReferencePluginInstanceId = identity.ModuleInstanceId
+                };
+
+                resp.Assigned.Add(assigned);
             }
 
-            // consumers
-            foreach (var path in request.ConsumerPaths ?? Enumerable.Empty<string>())
+            // 兼容：若 request.Tags 为空，但客户端可能期待按 ProducerPaths/ConsumerPaths 注册（保守兼容）
+            // （如果不需要可删除下面代码）
+            if ((request.Tags == null || request.Tags.Count == 0) && request.PluginInstanceId != null)
             {
-                if (string.IsNullOrWhiteSpace(path)) continue;
-                var identity = GetOrCreateIdentity(path, "Consumer", request.ModuleInstanceId);
-                resp.Identities.Add(identity);
+                // no-op fallback: nothing to register beyond given tags
             }
 
             return Task.FromResult(resp);
         }
 
+        // 使用 Tiema.Hosting.Abstractions.TagIdentity（不可变 record）
+        // 同一路径复用同一 handle；如需要更新 role/module 则创建新的 record 替换
         private TagIdentity GetOrCreateIdentity(string path, string role, string moduleInstanceId)
         {
             if (_byPath.TryGetValue(path, out var existing))
             {
-                // update role/owner if needed (keeps single handle per path)
-                existing.Role = role;
-                existing.OwnerModuleId = moduleInstanceId ?? existing.OwnerModuleId;
-                _byHandle[existing.Handle] = existing;
-                return existing;
+                // compute desired role
+                var desiredRole = role?.Equals("Producer", StringComparison.OrdinalIgnoreCase) == true
+                    ? TagRole.Producer
+                    : TagRole.Consumer;
+
+                if (existing.Role == desiredRole && existing.ModuleInstanceId == (moduleInstanceId ?? string.Empty))
+                {
+                    return existing;
+                }
+
+                // create updated record
+                var updated = new TagIdentity(existing.Handle, existing.Path, desiredRole, moduleInstanceId ?? string.Empty);
+                _byPath[path] = updated;
+                _byHandle[existing.Handle] = updated;
+                return updated;
             }
 
-            var handle = System.Threading.Interlocked.Increment(ref _nextHandle);
-            var identity = new TagIdentity
-            {
-                Handle = handle,
-                Path = path,
-                Role = role,
-                OwnerModuleId = moduleInstanceId ?? string.Empty
-            };
+            // 新建 identity（生成唯一 handle）
+            var handle = Interlocked.Increment(ref _nextHandle);
+            var mappedRole = role?.Equals("Producer", StringComparison.OrdinalIgnoreCase) == true
+                ? TagRole.Producer
+                : TagRole.Consumer;
 
-            _byPath[path] = identity;
-            _byHandle[handle] = identity;
-            return identity;
+            var identityNew = new TagIdentity(handle, path, mappedRole, moduleInstanceId ?? string.Empty);
+
+            _byPath[path] = identityNew;
+            _byHandle[handle] = identityNew;
+            return identityNew;
         }
 
         /// <summary>
-        /// Publish: 更新镜像并广播到订阅该 handle 的客户端。
+        /// Publish: 更新镜像并广播到订阅该 handle 的客户端（使用 TagValue / Update）。
         /// </summary>
         public override Task<PublishResponse> Publish(PublishRequest request, ServerCallContext context)
         {
             if (request == null)
             {
-                return Task.FromResult(new PublishResponse { Ok = false, Error = "null request" });
+                return Task.FromResult(new PublishResponse { Success = false, Message = "null request" });
             }
 
-            // update mirror
-            _mirror[request.Handle] = (request.Value, request.Timestamp, request.Quality, request.SourceModuleId ?? string.Empty);
+            var tag = request.Tag;
+            if (tag == null)
+                return Task.FromResult(new PublishResponse { Success = false, Message = "empty tag" });
 
-            // broadcast (fire-and-forget writes; capture exceptions per-subscriber)
-            if (_subscribers.TryGetValue(request.Handle, out var list))
+            // 将 TagValue 打包为 Any 存镜像以兼容其他代码（也可直接存 TagValue）
+            try
+            {
+                var any = Any.Pack(tag);
+                var ts = Timestamp.FromDateTime(DateTimeOffset.FromUnixTimeMilliseconds(
+                    tag.TimestampUnixMs > 0 ? tag.TimestampUnixMs : DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()
+                ).UtcDateTime);
+
+                _mirror[tag.Handle] = (any, ts, (uint)tag.Quality, tag.SourcePluginId ?? string.Empty);
+            }
+            catch
+            {
+                // 如果 pack 失败，仍然继续广播原始 tag
+            }
+
+            if (_subscribers.TryGetValue(tag.Handle, out var list))
             {
                 List<IServerStreamWriter<Update>> snapshot;
                 lock (list)
@@ -116,16 +163,11 @@ namespace Tiema.Runtime.Services
 
                 var update = new Update
                 {
-                    Handle = request.Handle,
-                    Value = request.Value,
-                    Timestamp = request.Timestamp,
-                    Quality = request.Quality,
-                    SourceModuleId = request.SourceModuleId ?? string.Empty
+                    Tag = tag
                 };
 
                 foreach (var writer in snapshot)
                 {
-                    // send asynchronously, do not block Publish
                     _ = Task.Run(async () =>
                     {
                         try
@@ -134,14 +176,13 @@ namespace Tiema.Runtime.Services
                         }
                         catch (Exception ex)
                         {
-                            // best-effort: log and continue; stale/closed streams will be removed by subscription handler
-                            Console.WriteLine($"[WARN] Failed to push update to subscriber (handle={request.Handle}): {ex.Message}");
+                            Console.WriteLine($"[WARN] Failed to push update to subscriber (handle={tag.Handle}): {ex.Message}");
                         }
                     });
                 }
             }
 
-            return Task.FromResult(new PublishResponse { Ok = true });
+            return Task.FromResult(new PublishResponse { Success = true, Message = string.Empty });
         }
 
         /// <summary>
@@ -154,10 +195,18 @@ namespace Tiema.Runtime.Services
 
             if (_mirror.TryGetValue(request.Handle, out var entry))
             {
-                resp.Value = entry.Value;
-                resp.Timestamp = entry.Ts;
-                resp.Quality = entry.Quality;
-                resp.Found = true;
+                try
+                {
+                    // 尝试把存的 Any 解包为 TagValue（如果是 TagValue）
+                    var tv = entry.Value.Unpack<TagValue>();
+                    resp.Value = tv;
+                    resp.Found = true;
+                }
+                catch
+                {
+                    // 如果不是 TagValue（历史原因），可以选择不返回或转换为 TagValue 包装
+                    resp.Found = false;
+                }
             }
 
             return Task.FromResult(resp);
@@ -186,15 +235,16 @@ namespace Tiema.Runtime.Services
                 // on subscribe, optionally send current snapshot if exists
                 if (_mirror.TryGetValue(handle, out var entry))
                 {
-                    var initial = new Update
+                    try
                     {
-                        Handle = handle,
-                        Value = entry.Value,
-                        Timestamp = entry.Ts,
-                        Quality = entry.Quality,
-                        SourceModuleId = entry.Source
-                    };
-                    await responseStream.WriteAsync(initial).ConfigureAwait(false);
+                        var tv = entry.Value.Unpack<TagValue>();
+                        var initial = new Update { Tag = tv };
+                        await responseStream.WriteAsync(initial).ConfigureAwait(false);
+                    }
+                    catch
+                    {
+                        // fallback: 原有逻辑或忽略
+                    }
                 }
 
                 // wait until client cancels
@@ -220,6 +270,16 @@ namespace Tiema.Runtime.Services
                 {
                     list.Remove(responseStream);
                 }
+            }
+        }
+
+        // 新增到 GrpcBackplaneServer 类中：一个内部测试用注入方法
+        internal void AddTestSubscriber(uint handle, IServerStreamWriter<Update> writer)
+        {
+            var list = _subscribers.GetOrAdd(handle, _ => new List<IServerStreamWriter<Update>>());
+            lock (list)
+            {
+                list.Add(writer);
             }
         }
     }

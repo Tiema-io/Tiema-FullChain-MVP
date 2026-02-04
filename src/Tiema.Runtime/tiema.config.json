@@ -96,7 +96,7 @@
   },
   "messaging": {
     "enabled": true,
-    "transport": "inmemory",
+    "transport": "grpc",
     "host": "localhost",
     "port": 50051
   }

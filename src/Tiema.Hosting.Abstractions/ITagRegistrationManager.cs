@@ -1,4 +1,5 @@
 ﻿using System.Collections.Generic;
+using Tiema.Protocols.V1;
 
 namespace Tiema.Hosting.Abstractions
 {
@@ -40,9 +41,5 @@ namespace Tiema.Hosting.Abstractions
         TagRole Role,
         string ModuleInstanceId);
 
-    public enum TagRole
-    {
-        Producer = 0,
-        Consumer = 1,
-    }
+ 
 }

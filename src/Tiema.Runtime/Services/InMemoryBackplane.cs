@@ -11,13 +11,16 @@ namespace Tiema.Runtime.Services
     /// 内存 Backplane 实现：维护全局 Tag 镜像，支持发布/订阅。
     /// In-memory backplane implementation: maintains global tag mirror, supports publish/subscribe.
     /// </summary>
-    public class InMemoryBackplane : IBackplane
+    public class InMemoryBackplane : IBackplane, IDisposable
     {
         private readonly ConcurrentDictionary<uint, object?> _tagMirror = new();
         private readonly ConcurrentDictionary<uint, List<Action<object>>> _subscribers = new();
+        private int _disposed;
 
         public Task PublishAsync(uint handle, object value, CancellationToken ct = default)
         {
+            if (IsDisposed) return Task.CompletedTask;
+
             // 更新镜像。
             // Update mirror.
             _tagMirror[handle] = value;
@@ -26,7 +29,7 @@ namespace Tiema.Runtime.Services
             // Push to subscribers.
             if (_subscribers.TryGetValue(handle, out var callbacks))
             {
-                foreach (var callback in callbacks)
+                foreach (var callback in callbacks.ToArray())
                 {
                     try
                     {
@@ -52,10 +55,14 @@ namespace Tiema.Runtime.Services
         {
             if (onUpdate == null)
                 throw new ArgumentNullException(nameof(onUpdate));
+            if (IsDisposed) throw new ObjectDisposedException(nameof(InMemoryBackplane));
 
             var callbacks = _subscribers.GetOrAdd(handle, _ => new List<Action<object>>());
-            callbacks.Add(onUpdate);
-            return new Subscription(handle, onUpdate, () => callbacks.Remove(onUpdate));
+            lock (callbacks) callbacks.Add(onUpdate);
+            return new Subscription(handle, onUpdate, () =>
+            {
+                lock (callbacks) callbacks.Remove(onUpdate);
+            });
         }
 
         private sealed class Subscription : IDisposable
@@ -63,6 +70,7 @@ namespace Tiema.Runtime.Services
             private readonly uint _handle;
             private readonly Action<object> _callback;
             private readonly Action _unsubscribe;
+            private int _disposed;
 
             public Subscription(uint handle, Action<object> callback, Action unsubscribe)
             {
@@ -73,8 +81,32 @@ namespace Tiema.Runtime.Services
 
             public void Dispose()
             {
-                _unsubscribe();
+                if (Interlocked.Exchange(ref _disposed, 1) == 1) return;
+                try { _unsubscribe(); } catch { }
             }
+        }
+
+        private bool IsDisposed => Volatile.Read(ref _disposed) != 0;
+
+        public void Dispose()
+        {
+            if (Interlocked.Exchange(ref _disposed, 1) == 1) return;
+
+            try
+            {
+                // Clear mirrors and subscribers to break references
+                _tagMirror.Clear();
+
+                foreach (var kv in _subscribers)
+                {
+                    lock (kv.Value)
+                    {
+                        kv.Value.Clear();
+                    }
+                }
+                _subscribers.Clear();
+            }
+            catch { /* best-effort */ }
         }
     }
 }

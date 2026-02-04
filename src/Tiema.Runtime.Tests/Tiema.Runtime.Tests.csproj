@@ -15,6 +15,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\Tiema.Protocols\Tiema.Protocols.csproj" />
     <ProjectReference Include="..\Tiema.Runtime\Tiema.Runtime.csproj" />
   </ItemGroup>
 

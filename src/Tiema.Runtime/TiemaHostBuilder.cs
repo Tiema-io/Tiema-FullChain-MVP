@@ -101,8 +101,9 @@ namespace Tiema.Runtime
             // 2. 统一服务注册表
             var services = _serviceRegistry ?? new SimpleServiceRegistry(rackManager);
 
-            // 3. 核心运行时服务（若未注入则使用内存默认实现）
-            var tagRegistrationManager = _tagRegistrationManager ?? new InMemoryTagRegistrationManager();
+            // 3. 核心运行时服务（延迟决定注册管理器实现）
+            //    不在此处默认创建 InMemoryTagRegistrationManager，优先使用注入实现。
+            ITagRegistrationManager? tagRegistrationManager = _tagRegistrationManager;
 
             // Decide backplane implementation:
             IBackplane backplane;
@@ -112,13 +113,22 @@ namespace Tiema.Runtime
             }
             else if (!string.IsNullOrEmpty(_grpcBackplaneUrl))
             {
-                // Create a GrpcBackplaneClient stub/adaptor. Real gRPC implementation can replace this class.
-                backplane = new GrpcBackplaneClient(_grpcBackplaneUrl);
+                // Create a GrpcBackplaneTransport (client). Real gRPC implementation can replace this class.
+                backplane = new GrpcBackplaneTransport(_grpcBackplaneUrl);
+
+                // 如果用户未显式提供 registration manager，则为 gRPC 模式创建远端注册管理器
+                if (tagRegistrationManager == null)
+                {
+                    tagRegistrationManager = new GrpcTagRegistrationManager(_grpcBackplaneUrl);
+                }
             }
             else
             {
                 backplane = new InMemoryBackplane();
             }
+
+            // 最后回退：若仍未提供 registration manager，则使用 InMemory
+            tagRegistrationManager ??= new InMemoryTagRegistrationManager();
 
             var tagService = _tagService ?? new BuiltInTagService(tagRegistrationManager, backplane);
             var messageService = _messageService ?? new BuiltInMessageService();

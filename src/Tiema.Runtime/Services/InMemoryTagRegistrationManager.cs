@@ -3,20 +3,23 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using Tiema.Hosting.Abstractions;
+using Tiema.Protocols.V1;
 
 namespace Tiema.Runtime.Services
 {
     /// <summary>
-    /// 内存版 Tag 注册管理器，实现句柄分配与简单查询。
+    /// 内存版 Tag 注册管理器：句柄分配与简单查询（支持释放/清理）。
     /// In-memory tag registration manager: handle allocation and simple lookup.
     /// </summary>
-    public class InMemoryTagRegistrationManager : ITagRegistrationManager
+    public class InMemoryTagRegistrationManager : ITagRegistrationManager, IDisposable
     {
         private uint _nextHandle = 1;
 
         private readonly ConcurrentDictionary<uint, TagIdentity> _byHandle = new();
         private readonly ConcurrentDictionary<string, TagIdentity> _byPath =
             new(StringComparer.OrdinalIgnoreCase);
+
+        private int _disposed;
 
         public IReadOnlyList<TagIdentity> RegisterModuleTags(
             string moduleInstanceId,
@@ -64,8 +67,6 @@ namespace Tiema.Runtime.Services
 
         private TagIdentity CreateOrGetIdentity(string path, TagRole role, string moduleInstanceId)
         {
-            // 简化策略：同一路径只分配一个 handle，后注册的角色/模块会覆盖角色/模块字段。
-            // Simplified strategy: one handle per path; later registrations overwrite role/module.
             if (_byPath.TryGetValue(path, out var existing))
             {
                 return existing;
@@ -78,6 +79,18 @@ namespace Tiema.Runtime.Services
             _byPath[path] = identity;
 
             return identity;
+        }
+
+        public void Dispose()
+        {
+            if (Interlocked.Exchange(ref _disposed, 1) == 1) return;
+
+            try
+            {
+                _byHandle.Clear();
+                _byPath.Clear();
+            }
+            catch { /* best-effort */ }
         }
     }
 }

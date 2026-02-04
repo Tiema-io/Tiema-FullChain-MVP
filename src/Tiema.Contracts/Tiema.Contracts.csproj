@@ -6,4 +6,8 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\Tiema.Protocols\Tiema.Protocols.csproj" />
+  </ItemGroup>
+
 </Project>

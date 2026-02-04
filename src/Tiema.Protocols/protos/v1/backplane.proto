@@ -1,0 +1,23 @@
+﻿syntax = "proto3";
+
+package tiema.protocols.v1;
+
+option csharp_namespace = "Tiema.Protocols.V1";
+
+// 引入 tagsystem.proto 中的消息定义（TagValue/TagBatch/RegisterTags/...）
+import "protos/v1/tagsystem.proto";
+
+// Backplane 服务（RPC）定义：使用 tagsystem 中的消息类型
+service Backplane {
+  // 发布单个 Tag（TagValue 已在 tagsystem.proto 定义）
+  rpc Publish (PublishRequest) returns (PublishResponse);
+
+  // 获取最新值（按 handle）
+  rpc GetLastValue (GetRequest) returns (GetResponse);
+
+  // 订阅（可以是单句柄或批量/assembly 订阅），服务器以流式 Update 推送
+  rpc Subscribe (SubscribeRequest) returns (stream Update);
+
+  // 插件注册 Tags（Adapter/Plugin 在初始化时调用，返回分配结果）
+  rpc RegisterTags (RegisterTagsRequest) returns (RegisterTagsResponse);
+}

@@ -52,6 +52,8 @@ namespace Tiema.Runtime
             _config = config ?? throw new ArgumentNullException(nameof(config));
 
             _rackManager = rackManager ?? throw new ArgumentNullException(nameof(rackManager));
+            _slot_manager_check: ; // placeholder to keep debug view stable
+
             _slotManager = slotManager ?? throw new ArgumentNullException(nameof(slotManager));
             _services    = services ?? throw new ArgumentNullException(nameof(services));
 
@@ -73,6 +75,7 @@ namespace Tiema.Runtime
         {
             public IModule Module { get; }
             public DefaultModuleContext Context { get; }
+            public List<IDisposable> AutoRegistrations { get; } = new();
 
             public HostedModule(IModule module, DefaultModuleContext context)
             {
@@ -256,6 +259,8 @@ namespace Tiema.Runtime
                     try
                     {
                         entry.Module.Stop();
+                        // dispose any auto-registrations remaining
+                        foreach (var d in entry.AutoRegistrations) try { d.Dispose(); } catch { }
                     }
                     catch (Exception ex)
                     {
@@ -372,35 +377,24 @@ namespace Tiema.Runtime
                 var moduleContext = new DefaultModuleContext(this, moduleId, _tagService, _messageService, _services);
 
                 // 保存模块条目（保证在 Initialize/Declare 时能通过 moduleId 找到上下文/状态）
-                _modules[moduleId] = new HostedModule(moduleInstance, moduleContext);
+                var hosted = new HostedModule(moduleInstance, moduleContext);
+                _modules[moduleId] = hosted;
 
                 // 调用模块初始化（模块的 DeclareProducer/DeclareConsumer 会通过 Context 立即注册）
                 moduleInstance.Initialize(moduleContext);
 
-                // 主机级别的补注册（幂等）：收集模块在初始化期间声明的 tags 并再次调用注册器
-                // 这样在模块可能未显式声明某些 tag 时仍能保证注册完毕（与 ModuleScoped 注册互补，且安全）
-                if (_tagService is BuiltInTagService builtInTagService)
+                // 使用 TagAutoRegistrar 进行集中注册并自动建立订阅/发布 wiring（幂等）
+                try
                 {
-                    Console.WriteLine($"[DEBUG] Registering tags for module {moduleId}: Producers={string.Join(",", builtInTagService.GetDeclaredProducers())}, Consumers={string.Join(",", builtInTagService.GetDeclaredConsumers())}");
-                    var identities = _tagRegistrationManager.RegisterModuleTags(
-                        moduleId,
-                        builtInTagService.GetDeclaredProducers(),
-                        builtInTagService.GetDeclaredConsumers());
-
-                    foreach (var identity in identities)
+                    var disposables = TagAutoRegistrar.RegisterAndWire(moduleInstance, moduleContext, _tagRegistrationManager, _tagService);
+                    if (disposables != null && disposables.Count > 0)
                     {
-                        Console.WriteLine($"[DEBUG] Registered Tag: {identity.Path} (Handle: {identity.Handle}, Role: {identity.Role}) for module {moduleId}");
+                        hosted.AutoRegistrations.AddRange(disposables);
                     }
-
-                    // 通知 BuiltInTagService 注册完成，以便它可为本地声明的 consumer 建立 backplane 订阅
-                    try
-                    {
-                        builtInTagService.OnTagsRegistered(identities);
-                    }
-                    catch (Exception ex)
-                    {
-                        Console.WriteLine($"[WARN] OnTagsRegistered failed: {ex.Message}");
-                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"[WARN] TagAutoRegistrar failed for module {moduleId}: {ex.Message}");
                 }
 
                 // 启动模块（Start 可能会立即进入 Execute 循环）
@@ -523,6 +517,17 @@ namespace Tiema.Runtime
 
             // 清理上下文中的当前插槽引用
             entry.Context.SetCurrentSlot(null);
+
+            // Dispose auto-registrations created for this module (subscriptions, tasks...)
+            try
+            {
+                foreach (var d in entry.AutoRegistrations)
+                {
+                    try { d.Dispose(); } catch { }
+                }
+                entry.AutoRegistrations.Clear();
+            }
+            catch { /* best effort */ }
 
             // 卸载插槽中的模块引用
             try

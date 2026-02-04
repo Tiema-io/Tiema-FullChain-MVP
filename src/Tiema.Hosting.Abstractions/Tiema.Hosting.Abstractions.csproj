@@ -8,6 +8,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Tiema.Contracts\Tiema.Contracts.csproj" />
+    <ProjectReference Include="..\Tiema.Protocols\Tiema.Protocols.csproj" />
   </ItemGroup>
 
 </Project>
