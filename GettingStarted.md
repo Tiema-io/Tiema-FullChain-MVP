@@ -21,11 +21,12 @@
 2. 启动（开发）：在仓库根：
    - `cd src/Tiema.Runtime`
    - `dotnet run`
-3. 日志会输出启动流程、gRPC Backplane（如果启用）、以及模块加载/插槽插入信息。
+3. 日志会输出启动流程、Tiema 数据总线（Tiema Backplane, TB）（如果启用）、以及模块加载/插槽插入信息。
 
 环境变量（可选）
-- `TIEMA_USE_GRPC=1`：插件内示例若需要独立 gRPC 客户端可启用（demo 插件默认已移除 gRPC，宿主支持 gRPC Backplane）。  
-- `TIEMA_GRPC_ADDR`：若插件独立连接远端 Backplane，可设置地址（格式参见下文）。
+- `TIEMA_USE_GRPC=1`：启用通过 gRPC 连接 Tiema 数据总线（TB）的模式（宿主/插件可通过 gRPC 连接 TB）。  
+- `TIEMA_GRPC_ADDR`：若插件或宿主需要连接远端 Tiema 数据总线（通过 gRPC），可设置地址（例如 `http://127.0.0.1:50051`）。  
+- 备注：文档中也会以 “TB 地址” 或 `TIEMA_BACKPLANE_ADDR` 等术语出现；当前实现仍支持使用 `TIEMA_GRPC_ADDR` 作为连接示例。
 
 注意：Host 在 `LoadModule` 中会集中注册插件声明的 tags（不要在 `OnInitialize` 假定已分配句柄）。
 
@@ -85,14 +86,15 @@
 
 ---
 
-## gRPC 调试与测试
+## Tiema 数据总线（Tiema Backplane, TB）调试与测试
 
-宿主支持 gRPC Backplane，默认已移除插件示例中的 gRPC 相关代码。
+Tiema 数据总线（简称 TB）是平台的数据面：注册、发布、订阅与读取 Tag 的统一服务。宿主支持以 gRPC 方式连接 TB（开发时可使用本机内置的 InMemoryBackplane 便于调试）。
 
-- 启用 gRPC 客户端功能：设置环境变量 `TIEMA_USE_GRPC=1`，并确保宿主与插件间的地址配置正确。
-- 使用 `TIEMA_GRPC_ADDR` 指定远程 Backplane 地址（如 `ipv4:127.0.0.1:50051`）。
+- 启用通过 gRPC 连接 TB：设置环境变量 `TIEMA_USE_GRPC=1`，并确保宿主与插件间的地址配置正确。
+- 使用 `TIEMA_GRPC_ADDR`（或将来 `TIEMA_BACKPLANE_ADDR`）指定远端 TB 地址（例如 `http://127.0.0.1:50051`）。
+- 开发建议：优先在本地使用 InMemoryBackplane（调试更简单）；发布/分布式环境使用 TB（gRPC）以实现多宿主/跨语言互通。
 
-注意：gRPC 相关功能需在支持 gRPC 的宿主上测试，确保网络通畅。
+注意：gRPC/网络相关功能需在支持 gRPC 的宿主上测试，确保网络与证书配置（生产环境建议启用 TLS/mTLS）正确。
 
 ---
 

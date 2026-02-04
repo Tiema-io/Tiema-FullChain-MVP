@@ -22,7 +22,8 @@ namespace Tiema.Runtime
         /// <param name="args">命令行参数 / command-line arguments</param>
         private static void Main(string[] args)
         {
-            Console.WriteLine("=== Tiema Backplane v1.0 ===");
+            // 启动横幅：同时显示中文名与英文名与简称（TB）
+            Console.WriteLine("=== Tiema 数据总线（Tiema Backplane, TB） v1.0 ===");
 
             Server? grpcServer = null;
 
@@ -36,7 +37,7 @@ namespace Tiema.Runtime
                 // 构建 HostBuilder（先创建，后根据配置选择 backplane）
                 var hostBuilder = TiemaHostBuilder.Create(config);
 
-                // 如果配置启用 messaging 且选择了 grpc，则启动本地 gRPC Backplane 服务并把 client URL 注入到 HostBuilder
+                // 如果配置启用 messaging 且选择了 grpc，则启动本地 gRPC Tiema 数据总线（TB）服务并把 client URL 注入到 HostBuilder
                 if (config.Messaging != null && config.Messaging.Enabled &&
                     string.Equals(config.Messaging.Transport, "grpc", StringComparison.OrdinalIgnoreCase))
                 {
@@ -51,7 +52,7 @@ namespace Tiema.Runtime
                             Ports = { new ServerPort(bindHost, port, ServerCredentials.Insecure) }
                         };
                         grpcServer.Start();
-                        Console.WriteLine($"[INFO] Tiema Backplane server started on {bindHost}:{port}");
+                        Console.WriteLine($"[INFO] Tiema 数据总线（Tiema Backplane, TB）服务已启动: {bindHost}:{port}");
 
                         // client 连接地址：若 bindHost 为 0.0.0.0 则使用 loopback 地址作为 client 目标
                         var clientHost = bindHost == "0.0.0.0" ? "127.0.0.1" : bindHost;
@@ -60,11 +61,12 @@ namespace Tiema.Runtime
                         var grpcUrl = $"http://{clientHost}:{port}";
 
                         hostBuilder = hostBuilder.UseGrpcBackplane(grpcUrl);
-                        Console.WriteLine($"[INFO] HostBuilder configured to use gRPC backplane at {grpcUrl}");
+                        Console.WriteLine($"[INFO] HostBuilder 已配置为使用 TB（Tiema 数据总线）地址: {grpcUrl}");
+                        Console.WriteLine("[INFO] 术语说明：Tiema 数据总线 = Tiema Backplane (TB)");
                     }
                     catch (Exception ex)
                     {
-                        Console.WriteLine($"[WARN] Failed to start Tiema Backplane server: {ex.Message}");
+                        Console.WriteLine($"[WARN] 启动 Tiema 数据总线（TB）失败: {ex.Message}");
                         // 如果 server 启动失败，不中断主流程；HostBuilder 不注入 gRPC backplane，继续使用默认（InMemory）
                     }
                 }
@@ -74,7 +76,7 @@ namespace Tiema.Runtime
                     if (config.Messaging == null || !config.Messaging.Enabled || string.Equals(config.Messaging.Transport, "inmemory", StringComparison.OrdinalIgnoreCase))
                     {
                         hostBuilder = hostBuilder.UseInMemoryBackplane();
-                        Console.WriteLine("[INFO] HostBuilder configured to use InMemory backplane");
+                        Console.WriteLine("[INFO] HostBuilder 已配置为使用 InMemory 后台总线（仅用于本地调试）");
                     }
                 }
 
@@ -96,12 +98,12 @@ namespace Tiema.Runtime
                 {
                     try
                     {
-                        Console.WriteLine("[INFO] Shutting down Tiema Backplane server...");
+                        Console.WriteLine("[INFO] 正在关闭 Tiema 数据总线（TB）服务...");
                         grpcServer.ShutdownAsync().Wait(TimeSpan.FromSeconds(5));
                     }
                     catch (Exception ex)
                     {
-                        Console.WriteLine($"[WARN] Error shutting down Tiema Backplane server: {ex.Message}");
+                        Console.WriteLine($"[WARN] 关闭 Tiema 数据总线（TB）失败: {ex.Message}");
                     }
                 }
             }
