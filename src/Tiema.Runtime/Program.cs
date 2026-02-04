@@ -22,7 +22,7 @@ namespace Tiema.Runtime
         /// <param name="args">命令行参数 / command-line arguments</param>
         private static void Main(string[] args)
         {
-            Console.WriteLine("=== Tiema Runtime v0.1 ===");
+            Console.WriteLine("=== Tiema Backplane v1.0 ===");
 
             Server? grpcServer = null;
 
@@ -51,7 +51,7 @@ namespace Tiema.Runtime
                             Ports = { new ServerPort(bindHost, port, ServerCredentials.Insecure) }
                         };
                         grpcServer.Start();
-                        Console.WriteLine($"[INFO] gRPC Backplane server started on {bindHost}:{port}");
+                        Console.WriteLine($"[INFO] Tiema Backplane server started on {bindHost}:{port}");
 
                         // client 连接地址：若 bindHost 为 0.0.0.0 则使用 loopback 地址作为 client 目标
                         var clientHost = bindHost == "0.0.0.0" ? "127.0.0.1" : bindHost;
@@ -64,7 +64,7 @@ namespace Tiema.Runtime
                     }
                     catch (Exception ex)
                     {
-                        Console.WriteLine($"[WARN] Failed to start gRPC Backplane server: {ex.Message}");
+                        Console.WriteLine($"[WARN] Failed to start Tiema Backplane server: {ex.Message}");
                         // 如果 server 启动失败，不中断主流程；HostBuilder 不注入 gRPC backplane，继续使用默认（InMemory）
                     }
                 }
@@ -96,12 +96,12 @@ namespace Tiema.Runtime
                 {
                     try
                     {
-                        Console.WriteLine("[INFO] Shutting down gRPC Backplane server...");
+                        Console.WriteLine("[INFO] Shutting down Tiema Backplane server...");
                         grpcServer.ShutdownAsync().Wait(TimeSpan.FromSeconds(5));
                     }
                     catch (Exception ex)
                     {
-                        Console.WriteLine($"[WARN] Error shutting down gRPC server: {ex.Message}");
+                        Console.WriteLine($"[WARN] Error shutting down Tiema Backplane server: {ex.Message}");
                     }
                 }
             }

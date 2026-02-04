@@ -20,6 +20,9 @@
     <Project Path="src/Demo.Plugins/SimpleAlarm/SimpleAlarm.csproj" />
     <Project Path="src/Demo.Plugins/TemperatureLogic/TemperatureLogic.csproj" />
   </Folder>
+  <Folder Name="/src/Properties/">
+    <File Path="AssemblyInfo.cs" />
+  </Folder>
   <Folder Name="/解决方案项/">
     <File Path="README.md" />
   </Folder>

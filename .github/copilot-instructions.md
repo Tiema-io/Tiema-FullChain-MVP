@@ -2,11 +2,19 @@
 
 ## General Guidelines
 - Use bilingual Chinese-English comments in code and explanations by default.
-- Tiema 核心（runtime）不应引用 SDK，SDK 仅供插件使用。
-- 默认情况下，在提供代码修改建议时，仅显示修改内容并提供可选的 git 提交命令或补丁；仅在明确请求时再执行或自动提交。
+- Tiema 数据总线 (Tiema Backplane, TB) is an independent service as a unified data layer; any language can interoperate if it follows the protocol.
+- Architecture: keep single-process InMemory for debug; support multi-process with gRPC data plane and Named Pipe control plane; future: multiple hosts share a single or bridged Backplane across machines with namespaces, ACL, TLS.
+- Debugging: use unique ModuleInstanceId/pluginId, command-line args, and supervisor to manage and attach.
 - Implement single-process Tag/backplane first and avoid large expansions; prepare for cross-process (跨进程) plugin modes later, allowing the system to switch between in-process (InMemory) and distributed (gRPC) backplane modes for flexibility in debugging. **Prefer using InMemoryBackplane for debugging; switch to gRPC/remote Backplane for distributed/production.** Prefer applying EtherNet/IP design concepts (I/O assemblies, RPI/implicit IO, batching) over gRPC transport while keeping plugin/adapters extensibility; use InMemory for debugging and gRPC for production. **Adopt the implicit/explicit I/O concepts from CIP on the gRPC adapter, exposing tags in implicit I/O form via the plugin SDK, and first fix current subscription/reuse-related errors before implementing these concepts on the gRPC adapter (not a complete implementation of the EtherNet/IP protocol).**
 - Strengthen BuiltInTagService subscription management: ensure single backend subscription per handle, thread-safety, and reliable subscribe/unsubscribe behavior; use InMemory for debug and gRPC for production.
-- **TiemaTag 声明默认都是 implicit I/O（不设置 implicit/explicit）；explicit I/O 留待以后通过 Message 通道实现；背板在收到 publish 数据时应尽量不拆包，直接按 handle 路由并转发原始载荷。**
+- **TiemaTagAttribute lives in Contracts; TagAutoRegistrar registers after Initialize using ModuleInstanceId.** 
+- **TiemaTag 应用默认的 implicit I/O 设计，确保 explicit I/O 通过 Message 进行通信，发布时应确保直接影响 handle 的原始值。**
+
+## Project Plan for Tiema Backplane (TB)
+- **Stage A (MVP)**: Rename `GrpcBackplaneServer` to `TiemaBackplaneServer`, update Program startup logs and documentation to show 'Tiema 数据总线 (Tiema Backplane, TB)'; add optional `Tiema.BackplaneService` project.
+- **Stage B (naming & adapters)**: Rename client/adapter classes to `TiemaBackplane*` (e.g., `TiemaBackplaneTransport`, `TiemaBackplaneAdapter`, `TiemaBackplaneClient`); update proto comments.
+- **Stage C (validation & examples)**: Add `TiemaBackplaneClient` (.NET) and cross-language examples (Python/Go); update Getting Started documentation and run tests.
+- **Stage D (future)**: Extract TB to a separate repository, add authentication, namespaces, bridging, batching/RPI, and persistence. Ensure InMemory for debug and gRPC TB for production; TagAutoRegistrar/ModuleInstanceId/Contracts rules apply.
 
 ## Code Style
 - Follow specific formatting rules.
@@ -24,7 +32,6 @@
 - Keep `IModuleHost` minimal; remove dynamic loading APIs such as `LoadModule` and `LoadRacks` from the interface. Use `TiemaContainer` or a separate `IModuleManager` for dynamic module management, while `TiemaContainer` may keep concrete `LoadModule` methods.
 - `TiemaContainer` should expose `PlugModuleToSlot(moduleId, rackName, slotIndex)` to plug a loaded module into a slot, set the module's `DefaultModuleContext.CurrentSlot` via `SetCurrentSlot`, and call `ModuleBase.OnPlugged(slot)`.
 - `IModuleContext` now exposes `IServiceRegistry` and defines `CurrentSlot` as a non-nullable `ISlot`; `DefaultModuleContext` must implement this signature (CurrentSlot throws when not set) and expose `Services/Tables` as per host. Prefer modules to use `Context.Services` for service lookup.
-- **将 TagValue/TagBatch/RegisterTags 等写入专门的 tagsystem.proto（保留 backplane.proto 不变）；将现有 GrpcBackplaneClient 演进为更广义的 gRPC Adapter（建议命名为 GrpcBackplaneAdapter 或 GrpcIoAdapter）负责 adapter 职责（RegisterTags、assembly 管理、TagBatch 转发）。**
-- **命名偏好**：将低层 gRPC 客户端命名为 `GrpcBackplaneTransport`，高层适配器命名为 `GrpcBackplaneAdapter`（或 `GrpcIoAdapter`）；保留两层分离以职责清晰。
-- **DefaultModuleContext 应直接暴露注入的 ITagService（移除 ModuleScopedTagService）；宿主（TiemaHost.LoadModule）将执行标签注册；在使用 gRPC 背板时，TiemaHostBuilder 应注入 GrpcTagRegistrationManager，以便注册走远端。模块在 Initialize 期间不应依赖立即可用的句柄。**
-- **Move gRPC registration/subscription from OnInitialize to OnStart in ModbusSensor and TemperatureLogic so modules no longer assume handles during Initialize; modules should not rely on immediate handle allocation during Initialize.**
+- **TagValue/TagBatch/RegisterTags should be defined in `tagsystem.proto` and `backplane.proto`; ensure `GrpcBackplaneClient` is used for the gRPC Adapter, and adapt `GrpcBackplaneAdapter` and `GrpcIoAdapter` for registration.** 
+- **Move gRPC registration/subscription from `OnInitialize` to `OnStart` in `ModbusSensor` and `TemperatureLogic` so modules no longer assume handles during Initialize; modules should not rely on immediate handle allocation during Initialize.** 
+- **Open-source strategy with branding/BuildId, optional license token; avoid gRPC in demo plugins.**

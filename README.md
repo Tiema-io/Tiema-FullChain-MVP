@@ -37,22 +37,26 @@ Simple AlarmSubscriber插件，接收报警信息并打印到控制台
 7. gRPC Communication Layer / gRPC通信层
 
 
+//[] Cross-Process Communication Testing / 跨进程通信测试
+
+//[] Full-Chain Integration / 全链路集成
+
+//[] Dockerized Deployment / Docker化部署
+
+//[] Documentation Improvement / 文档完善
 
 (Next 下一步 )
 
+从今天开始，项目进入第二阶段开发，目标是在接下来的10天内完成以下任务：
+
+1. Tiema Backplane 独立服务化 / Tiema Backplane as an Independent Service
+2. 开始做一个最小TB （Tiema数据总线/Tiema Backplane）服务，实现基本的Tag读写和订阅功能 / Start a minimal TB (Tiema Backplane) service, implementing basic Tag read/write and subscription functionality
+3. 端到端验证 本机TB服务 +宿主连接 +Demo插件 通过Tags通信 / End-to-end verification of local TB service + host connection + Demo plugins communicating via Tags
+4. 提供一个跨语言的最小客户端示例（Python/Go)验证Register/Publish/Subscribe功能 / Provide a minimal cross-language client example (Python/Go) to verify Register/Publish/Subscribe functionality
+1. 
 
 
-grpc已经就绪，可以进行跨进程通信测试了。
 
-
-
-[] Cross-Process Communication Testing / 跨进程通信测试
-
-[] Full-Chain Integration / 全链路集成
-
-[] Dockerized Deployment / Docker化部署
-
-[] Documentation Improvement / 文档完善
 
 
 
