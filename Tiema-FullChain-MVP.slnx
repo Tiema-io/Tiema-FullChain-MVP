@@ -1,5 +1,6 @@
 <Solution>
   <Folder Name="/docs/">
+    <File Path="API_Idemopotency.md" />
     <File Path="GettingStarted.md" />
   </Folder>
   <Folder Name="/plugins/" />

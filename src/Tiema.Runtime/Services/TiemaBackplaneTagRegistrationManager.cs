@@ -46,18 +46,20 @@ namespace Tiema.Runtime.Services
         public IReadOnlyList<TagIdentity> RegisterModuleTags(string moduleInstanceId, IEnumerable<string> producerPaths, IEnumerable<string> consumerPaths)
         {
             if (_disposed) throw new ObjectDisposedException(nameof(TiemaBackplaneTagRegistrationManager));
-            var req = new RegisterTagsRequest { PluginInstanceId = moduleInstanceId ?? string.Empty };
+            // 对应 proto: RegisterTagsRequest.module_instance_id
+            var req = new RegisterTagsRequest { ModuleInstanceId = moduleInstanceId ?? string.Empty };
 
             foreach (var p in producerPaths ?? Enumerable.Empty<string>())
             {
                 if (string.IsNullOrWhiteSpace(p)) continue;
-                req.Tags.Add(new RegisterTagInfo { TagName = p, Role = TagRole.Producer });
+                // 对应 proto: RegisterTagInfo.tag_path
+                req.Tags.Add(new RegisterTagInfo { TagPath = p, Role = TagRole.Producer });
             }
 
             foreach (var c in consumerPaths ?? Enumerable.Empty<string>())
             {
                 if (string.IsNullOrWhiteSpace(c)) continue;
-                req.Tags.Add(new RegisterTagInfo { TagName = c, Role = TagRole.Consumer });
+                req.Tags.Add(new RegisterTagInfo { TagPath = c, Role = TagRole.Consumer });
             }
 
             try
@@ -68,10 +70,11 @@ namespace Tiema.Runtime.Services
                 {
                     foreach (var a in resp.Assigned)
                     {
-                        var path = a.TagName ?? string.Empty;
+                        // 对应 proto 字段名：tag_path / source_module_instance_id / reference_module_instance_id
+                        var path = a.TagPath ?? string.Empty;
                         var role = a.Role;
                         var handle = a.Handle;
-                        var src = a.SourcePluginInstanceId ?? moduleInstanceId ?? string.Empty;
+                        var src = a.SourceModuleInstanceId ?? moduleInstanceId ?? string.Empty;
 
                         var identity = new TagIdentity(handle, path, role, src);
 

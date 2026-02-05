@@ -46,13 +46,13 @@ namespace Tiema.Runtime.Services
         {
             EnsureNotDisposed();
 
-            // 构造 TagValue
+            // 构造 TagValue：使用 proto 新字段名（Timestamp, SourceModuleInstanceId）
             var tag = new TagValue
             {
                 Handle = handle,
-                TimestampUnixMs = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
-                Quality = 0,
-                SourcePluginId = string.Empty
+                Timestamp = Timestamp.FromDateTime(DateTime.UtcNow),
+                Quality = QualityCode.QualityUnknown,
+                SourceModuleInstanceId = string.Empty
             };
 
             switch (value)

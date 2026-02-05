@@ -68,7 +68,7 @@ namespace Tiema.Runtime.Tests
             {
                 Handle = handle,
                 IntValue = 123L,
-                TimestampUnixMs = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()
+                Timestamp = Timestamp.FromDateTime(DateTime.UtcNow),
             };
 
             await backplane.PublishAsync(handle, tag);
@@ -103,7 +103,8 @@ namespace Tiema.Runtime.Tests
             {
                 Handle = handle,
                 StringValue = "ok",
-                TimestampUnixMs = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()
+            
+                Timestamp = Timestamp.FromDateTime(DateTime.UtcNow),
             };
 
             var any = Any.Pack(tag);
@@ -143,7 +144,8 @@ namespace Tiema.Runtime.Tests
             {
                 Handle = handle,
                 DoubleValue = 3.14,
-                TimestampUnixMs = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()
+         
+                Timestamp = Timestamp.FromDateTime(DateTime.UtcNow),
             };
 
             await backplane.PublishAsync(handle, tag);

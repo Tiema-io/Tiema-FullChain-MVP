@@ -9,6 +9,7 @@
 - Strengthen BuiltInTagService subscription management: ensure single backend subscription per handle, thread-safety, and reliable subscribe/unsubscribe behavior; use InMemory for debug and gRPC for production.
 - **TiemaTagAttribute lives in Contracts; TagAutoRegistrar registers after Initialize using ModuleInstanceId.** 
 - **TiemaTag 应用默认的 implicit I/O 设计，确保 explicit I/O 通过 Message 进行通信，发布时应确保直接影响 handle 的原始值。**
+- Keep work in the current feature branch 'feat/tiema-backplane-mvp' rather than creating many short-lived branches; prefer small commits and pushes on that branch.
 
 ## Project Plan for Tiema Backplane (TB)
 - **Stage A (MVP)**: Rename `GrpcBackplaneServer` to `TiemaBackplaneServer`, update Program startup logs and documentation to show 'Tiema 数据总线 (Tiema Backplane, TB)'; add optional `Tiema.BackplaneService` project.

@@ -1,10 +1,24 @@
-﻿syntax = "proto3";
+﻿// tagsystem.proto
+// Tiema 数据总线 (Tiema Backplane, TB) — tagsystem 定义
+// Version: v0.1
+// Description: Tag model and helper messages for Tiema Backplane v0.1.
+// 双语注释 / Bilingual notes included.
+// 向后兼容说明：字段编号已尽量保留；客户端请按新字段读取（timestamp 优先）。
+// Backwards-compatibility: add new fields as optional, do not change existing field numbers.
+
+syntax = "proto3";
 
 package tiema.protocols.v1;
 
 option csharp_namespace = "Tiema.Protocols.V1";
+option go_package = "tiema/protos/v1;tiemav1";
+option java_package = "io.tiema.protocols.v1";
+
+
+import "google/protobuf/timestamp.proto";
 
 // 质量码（示例，可扩展）
+// Quality codes (example, extendable)
 enum QualityCode {
   QUALITY_UNKNOWN = 0;
   QUALITY_GOOD = 1;
@@ -12,6 +26,7 @@ enum QualityCode {
 }
 
 // Tag 角色
+// Tag role
 enum TagRole {
   TAG_ROLE_UNSPECIFIED = 0;
   TAG_ROLE_PRODUCER = 1;
@@ -19,11 +34,18 @@ enum TagRole {
 }
 
 // 单个 Tag 值：handle 放在第一位，便于快速路由与三段式解析。
+// 使用标准 Timestamp 替代原先的 unix ms 字段以获得跨语言精度语义。
+// Field numbers are preserved where applicable; do not renumber published fields.
 message TagValue {
   uint32 handle = 1; // 全局句柄（可按 rack/slot/tag 三段编码）
+                     // Global handle (can encode rack/slot/tag)
 
-  string name = 2;
-  int64 timestamp_unix_ms = 3;
+  string path = 2;   // Tag 的完整路径，建议格式 site/rack/slot/tag
+                     // Full tag path, e.g. site/rack/slot/tag
+
+  // 标准时间戳（首选字段），跨语言支持且精度更高（UTC）
+  // Preferred standard timestamp (UTC), cross-language supported
+  google.protobuf.Timestamp timestamp = 3;
 
   oneof value {
     bool bool_value = 4;
@@ -31,48 +53,66 @@ message TagValue {
     double double_value = 6;
     string string_value = 7;
     bytes bytes_value = 8; // 原始二进制，便于零拷贝或自定义序列化
+                           // Raw bytes for zero-copy or custom serialization
   }
 
   QualityCode quality = 9;
   TagRole role = 10; // 指明 Producer / Consumer
-  string source_plugin_id = 11; // Producer 插件实例 ID（仅当 role=PRODUCER 有效）
-  string reference_plugin_instance_id = 12; // Consumer 插件实例 ID（仅当 role=CONSUMER 时有效）
+                     // Indicates Producer/Consumer
+
+  // 与 runtime 对齐：使用 module_instance_id 表示模块实例
+  // Align with runtime: use module_instance_id to identify module instance
+  string source_module_instance_id = 11;      // Producer 模块实例 ID (当 role=PRODUCER 有效)
+                                             // Producer module instance ID (valid when role=PRODUCER)
+  string reference_module_instance_id = 12;   // Consumer 模块实例 ID (当 role=CONSUMER 有效)
+                                             // Consumer module instance ID (valid when role=CONSUMER)
+
+  // 可扩展元数据（单位、描述、标签等）
+  // Optional metadata map for unit/description/tags etc.
+  map<string, string> metadata = 13;
 }
 
 // 批量 Tag（用于 assembly/批量交换）
+// Tag batch (for assemblies / batching)
 message TagBatch {
-  string plugin_instance_id = 1; // 发送者实例 ID（可用于路由/审计）
+  // 发送者的模块实例 ID（用于路由/审计）
+  // Module instance id of sender (for routing/audit)
+  string module_instance_id = 1;
   repeated TagValue tags = 2;
 }
 
-// Plugin 注册相关
+// Plugin/Module 注册相关
+// Registration info for a tag from a module
 message RegisterTagInfo {
-  string source_plugin_instance_id = 1; // Producer 插件实例 ID（当 role=PRODUCER 有效）
-  uint32 handle = 2; // 建议可选：如果插件提供 handle，则服务器可接受或重写
-  string tag_name = 3;
+  // 使用 module 实例名替代原 plugin 字段（与 runtime 术语对齐）
+  // Use module instance id aligning with runtime terminology
+  string source_module_instance_id = 1; // Producer 模块实例 ID（当 role=PRODUCER 有效）
+  uint32 handle = 2;                    // 可选：如果客户端提供 handle，服务器可接受或重写
+  string tag_path = 3;                  // 注册的 tag 路径（与 TagValue.path 对应）
   TagRole role = 4;
-  string reference_plugin_instance_id = 5; // 当 role=CONSUMER 有效（引用的消费者实例）
+  string reference_module_instance_id = 5; // 当 role=CONSUMER 有效（引用的消费者实例）
 }
 
 message RegisterTagsRequest {
-  string plugin_instance_id = 1;
-  repeated RegisterTagInfo tags = 2; // 插件可以带 name / 建议的 handle（可选）
+  // 请求级别的 module 实例 ID（若每条 RegisterTagInfo 中未显式指定，则以此为默认）
+  // Request-level module instance id; fallback if per-item not provided
+  string module_instance_id = 1;
+  repeated RegisterTagInfo tags = 2; // 批量注册
 }
 
 message RegisterTagsResponse {
   bool success = 1;
-  repeated RegisterTagInfo assigned = 2; // 返回带 handle 的分配结果
+  repeated RegisterTagInfo assigned = 2; // 返回带 handle 的分配结果（逐条对应）
   string message = 3;
 }
 
 // 订阅请求：兼容单句柄与批量订阅（assembly）
-// - client 可使用 handle 单独订阅（向后兼容）
-// - 或使用 tags 列表订阅多个 tag（用于 assembly）并带上 rpi_ms
+// Subscribe request: supports single-handle and batch/assembly subscriptions
 message SubscribeRequest {
   uint32 handle = 1; // 向后兼容：单句柄订阅（可不填）
-  repeated RegisterTagInfo tags = 2; // 批量/assembly 订阅（可跨进程一次性订阅多 tag）
-  uint32 rpi_ms = 3; // 请求的周期（Requested Packet Interval）, 0 表示按更新触发
-  string subscriber_id = 4; // 可选订阅者标识，用于服务器端管理
+  repeated RegisterTagInfo tags = 2; // 批量/assembly 订阅
+  uint32 rpi_ms = 3; // Requested Packet Interval（0 表示按更新触发）
+  string subscriber_id = 4; // 可选订阅者标识，用于服务器端管理/去重
 }
 
 // 单句柄快捷请求（可选）
@@ -83,7 +123,11 @@ message SubscribeSingleRequest {
 
 // Publish / Get 请求/响应
 message PublishRequest {
-  TagValue tag = 1; // 建议使用 TagValue 原样发送，避免在背板层强制拆包
+  // 支持单条或批量发布：单条使用 tag，批量使用 batch
+  oneof payload {
+    TagValue tag = 1;
+    TagBatch batch = 2;
+  }
 }
 
 message PublishResponse {
@@ -101,11 +145,10 @@ message GetResponse {
 }
 
 // Update 消息：Server->Client 的流式更新，可复用 TagValue 或 TagBatch
+// Update message: server -> client stream payload
 message Update {
-  // 单条更新或批量更新（取决于实现与订阅类型）
   oneof payload {
     TagValue tag = 1;
     TagBatch batch = 2;
   }
 }
-

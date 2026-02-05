@@ -53,7 +53,10 @@ Simple AlarmSubscriber插件，接收报警信息并打印到控制台
 2. 开始做一个最小TB （Tiema数据总线/Tiema Backplane）服务，实现基本的Tag读写和订阅功能 / Start a minimal TB (Tiema Backplane) service, implementing basic Tag read/write and subscription functionality
 3. 端到端验证 本机TB服务 +宿主连接 +Demo插件 通过Tags通信 / End-to-end verification of local TB service + host connection + Demo plugins communicating via Tags
 4. 提供一个跨语言的最小客户端示例（Python/Go)验证Register/Publish/Subscribe功能 / Provide a minimal cross-language client example (Python/Go) to verify Register/Publish/Subscribe functionality
-1. 
+
+
+进度：1. 固化了proto的定义
+     
 
 
 

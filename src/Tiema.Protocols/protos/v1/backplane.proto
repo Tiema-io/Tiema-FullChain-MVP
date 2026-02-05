@@ -1,23 +1,38 @@
-﻿syntax = "proto3";
+﻿// backplane.proto
+// Tiema 数据总线 (Tiema Backplane, TB) backplane RPCs
+// 版本 / Version: v0.1
+// 说明：定义了 TB v0.1 使用的 RegisterTags / Publish / Subscribe / GetLastValue RPCs。
+// Note: defines RegisterTags / Publish / Subscribe / GetLastValue RPCs used by TB v0.1.
+
+syntax = "proto3";
 
 package tiema.protocols.v1;
 
 option csharp_namespace = "Tiema.Protocols.V1";
+option go_package = "github.com/tiema-io/tiema-protocols/protos/v1;tiemav1";
+option java_package = "io.tiema.protocols.v1";
+option java_multiple_files = true;
 
-// 引入 tagsystem.proto 中的消息定义（TagValue/TagBatch/RegisterTags/...）
+// 导入 tagsystem.proto（保留目录以匹配项目的 proto include 布局）
+// Import tagsystem.proto (keep directory to match project's proto include layout)
 import "protos/v1/tagsystem.proto";
 
 // Backplane 服务（RPC）定义：使用 tagsystem 中的消息类型
+// Backplane service (RPCs): uses messages defined in tagsystem.proto
 service Backplane {
   // 发布单个 Tag（TagValue 已在 tagsystem.proto 定义）
+  // Publish a single Tag (TagValue defined in tagsystem.proto)
   rpc Publish (PublishRequest) returns (PublishResponse);
 
   // 获取最新值（按 handle）
+  // Get the latest value by handle
   rpc GetLastValue (GetRequest) returns (GetResponse);
 
   // 订阅（可以是单句柄或批量/assembly 订阅），服务器以流式 Update 推送
+  // Subscribe (single-handle or batch/assembly). Server pushes stream of Update.
   rpc Subscribe (SubscribeRequest) returns (stream Update);
 
   // 插件注册 Tags（Adapter/Plugin 在初始化时调用，返回分配结果）
+  // Plugin registers tags (called by adapter/plugin during init; returns assignment)
   rpc RegisterTags (RegisterTagsRequest) returns (RegisterTagsResponse);
 }
