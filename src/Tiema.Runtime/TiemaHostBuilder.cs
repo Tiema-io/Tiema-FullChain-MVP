@@ -114,12 +114,12 @@ namespace Tiema.Runtime
             else if (!string.IsNullOrEmpty(_grpcBackplaneUrl))
             {
                 // Create a GrpcBackplaneTransport (client). Real gRPC implementation can replace this class.
-                backplane = new GrpcBackplaneTransport(_grpcBackplaneUrl);
+                backplane = new TiemaBackplaneTransport(_grpcBackplaneUrl);
 
                 // 如果用户未显式提供 registration manager，则为 gRPC 模式创建远端注册管理器
                 if (tagRegistrationManager == null)
                 {
-                    tagRegistrationManager = new GrpcTagRegistrationManager(_grpcBackplaneUrl);
+                    tagRegistrationManager = new TiemaBackplaneTagRegistrationManager(_grpcBackplaneUrl);
                 }
             }
             else

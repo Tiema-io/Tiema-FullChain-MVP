@@ -7,6 +7,7 @@
     <File Path="scripts/build.ps1" />
   </Folder>
   <Folder Name="/src/">
+    <Project Path="src/Tiema.BackplaneService/Tiema.BackplaneService.csproj" Id="f4155090-3ebe-4deb-938f-0b7a038e541d" />
     <Project Path="src/Tiema.Contracts/Tiema.Contracts.csproj" />
     <Project Path="src/Tiema.Hosting.Abstractions/Tiema.Hosting.Abstractions.csproj" Id="cb068cb6-dc56-47a2-99c4-3381b2697e57" />
     <Project Path="src/Tiema.Plugin.Sdk/Tiema.Sdk.csproj" />

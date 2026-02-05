@@ -12,7 +12,7 @@ namespace Tiema.Runtime.Services
     /// gRPC 版的 ITagRegistrationManager：把 RegisterModuleTags 转发到远端 Backplane 的 RegisterTags RPC，
     /// 并在本地缓存返回的 identities 以支持 GetByHandle/GetByPath 查询。
     /// </summary>
-    public sealed class GrpcTagRegistrationManager : ITagRegistrationManager, IDisposable
+    public sealed class TiemaBackplaneTagRegistrationManager : ITagRegistrationManager, IDisposable
     {
         private readonly Backplane.BackplaneClient _client;
         private readonly Channel _channel;
@@ -20,7 +20,7 @@ namespace Tiema.Runtime.Services
         private readonly ConcurrentDictionary<string, TagIdentity> _byPath = new(StringComparer.OrdinalIgnoreCase);
         private bool _disposed;
 
-        public GrpcTagRegistrationManager(string grpcUrl)
+        public TiemaBackplaneTagRegistrationManager(string grpcUrl)
         {
             if (string.IsNullOrWhiteSpace(grpcUrl)) throw new ArgumentNullException(nameof(grpcUrl));
 
@@ -45,7 +45,7 @@ namespace Tiema.Runtime.Services
 
         public IReadOnlyList<TagIdentity> RegisterModuleTags(string moduleInstanceId, IEnumerable<string> producerPaths, IEnumerable<string> consumerPaths)
         {
-            if (_disposed) throw new ObjectDisposedException(nameof(GrpcTagRegistrationManager));
+            if (_disposed) throw new ObjectDisposedException(nameof(TiemaBackplaneTagRegistrationManager));
             var req = new RegisterTagsRequest { PluginInstanceId = moduleInstanceId ?? string.Empty };
 
             foreach (var p in producerPaths ?? Enumerable.Empty<string>())

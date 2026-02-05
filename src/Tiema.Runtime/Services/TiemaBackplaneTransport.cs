@@ -18,7 +18,7 @@ namespace Tiema.Runtime.Services
     /// - 同时实现 IBackplane（本地 CLR 语义）与 ITagTransport（protobuf/网络语义）;
     /// - 传输层负责 RPC/序列化/流式订阅；高阶 Adapter 在此之上实现 assembly/周期逻辑。
     /// </summary>
-    public class GrpcBackplaneTransport : IBackplane, ITagTransport, IDisposable
+    public class TiemaBackplaneTransport : IBackplane, ITagTransport, IDisposable
     {
         private readonly GrpcChannel _channel;
         private readonly Backplane.BackplaneClient _client;
@@ -31,7 +31,7 @@ namespace Tiema.Runtime.Services
 
         private bool _disposed;
 
-        public GrpcBackplaneTransport(string url)
+        public TiemaBackplaneTransport(string url)
         {
             if (string.IsNullOrWhiteSpace(url)) throw new ArgumentNullException(nameof(url));
             _channel = GrpcChannel.ForAddress(url);
@@ -374,7 +374,7 @@ namespace Tiema.Runtime.Services
 
         private void EnsureNotDisposed()
         {
-            if (_disposed) throw new ObjectDisposedException(nameof(GrpcBackplaneTransport));
+            if (_disposed) throw new ObjectDisposedException(nameof(TiemaBackplaneTransport));
         }
 
         public void Dispose()
@@ -404,7 +404,7 @@ namespace Tiema.Runtime.Services
         // -------- SubscriptionGroup: per-handle 本地值单流 + 本地 fan-out --------
         private sealed class SubscriptionGroup : IDisposable
         {
-            private readonly GrpcBackplaneTransport _parent;
+            private readonly TiemaBackplaneTransport _parent;
             private readonly uint _handle;
             private readonly ConcurrentDictionary<Guid, Action<object>> _callbacks = new();
             private CancellationTokenSource _cts = new();
@@ -412,7 +412,7 @@ namespace Tiema.Runtime.Services
             private AsyncServerStreamingCall<Update>? _call;
             private readonly object _startLock = new();
 
-            public SubscriptionGroup(GrpcBackplaneTransport parent, uint handle)
+            public SubscriptionGroup(TiemaBackplaneTransport parent, uint handle)
             {
                 _parent = parent;
                 _handle = handle;
@@ -548,7 +548,7 @@ namespace Tiema.Runtime.Services
         // -------- RawSubscriptionGroup: per-handle protobuf Update 流的本地 fan-out（传递 Update 原始对象） --------
         private sealed class RawSubscriptionGroup : IDisposable
         {
-            private readonly GrpcBackplaneTransport _parent;
+            private readonly TiemaBackplaneTransport _parent;
             private readonly uint _handle;
             private readonly ConcurrentDictionary<Guid, Action<Update>> _callbacks = new();
             private CancellationTokenSource _cts = new();
@@ -556,7 +556,7 @@ namespace Tiema.Runtime.Services
             private AsyncServerStreamingCall<Update>? _call;
             private readonly object _startLock = new();
 
-            public RawSubscriptionGroup(GrpcBackplaneTransport parent, uint handle)
+            public RawSubscriptionGroup(TiemaBackplaneTransport parent, uint handle)
             {
                 _parent = parent;
                 _handle = handle;

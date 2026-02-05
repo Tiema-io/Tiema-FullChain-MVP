@@ -12,7 +12,7 @@
 
 ## Project Plan for Tiema Backplane (TB)
 - **Stage A (MVP)**: Rename `GrpcBackplaneServer` to `TiemaBackplaneServer`, update Program startup logs and documentation to show 'Tiema 数据总线 (Tiema Backplane, TB)'; add optional `Tiema.BackplaneService` project.
-- **Stage B (naming & adapters)**: Rename client/adapter classes to `TiemaBackplane*` (e.g., `TiemaBackplaneTransport`, `TiemaBackplaneAdapter`, `TiemaBackplaneClient`); update proto comments.
+- **Stage B (naming & adapters)**: Rename gRPC adapter/transport/client classes to use `TiemaBackplane*` prefix (e.g., `TiemaBackplaneTransport`, `TiemaBackplaneAdapter`, `TiemaBackplaneClient`); update proto comments for TB naming.
 - **Stage C (validation & examples)**: Add `TiemaBackplaneClient` (.NET) and cross-language examples (Python/Go); update Getting Started documentation and run tests.
 - **Stage D (future)**: Extract TB to a separate repository, add authentication, namespaces, bridging, batching/RPI, and persistence. Ensure InMemory for debug and gRPC TB for production; TagAutoRegistrar/ModuleInstanceId/Contracts rules apply.
 

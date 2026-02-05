@@ -17,7 +17,7 @@ namespace Tiema.Runtime.Services
     /// 目的：提供可运行的服务器骨架用于集成测试与本地验证。
     /// 注意：生产环境需要完善安全、持久化、高可用、限流等。
     /// </summary>
-    public class GrpcBackplaneServer : BackplaneBase
+    public class TiemaBackplaneServer : BackplaneBase
     {
         private readonly ConcurrentDictionary<uint, (Any Value, Timestamp Ts, uint Quality, string Source)> _mirror =
             new();
@@ -35,7 +35,7 @@ namespace Tiema.Runtime.Services
         // simple lock per handle list
         private object GetLockForHandle(uint handle) => (_subscribers.GetOrAdd(handle, _ => new List<IServerStreamWriter<Update>>()));
 
-        public GrpcBackplaneServer()
+        public TiemaBackplaneServer()
         {
         }
 

@@ -17,14 +17,14 @@ namespace Tiema.Runtime.Services
     /// 上层负责把 DTO 序列化为 protobuf 并发送到远端；远端收到 TagBatch 后同样可由上层反序列化
     /// 为 TagBatchDto 并调用 Adapter.OnTagBatchReceived 做原样回填。
     /// </summary>
-    public sealed class GrpcBackplaneAdapter : IDisposable
+    public sealed class TiemaBackplaneAdapter : IDisposable
     {
         private readonly IBackplane _transport;
         private readonly ITagRegistrationManager _registrationManager;
         private readonly ConcurrentDictionary<string, IoAssembly> _assemblies = new(StringComparer.OrdinalIgnoreCase);
         private bool _disposed;
 
-        public GrpcBackplaneAdapter(IBackplane transport, ITagRegistrationManager registrationManager)
+        public TiemaBackplaneAdapter(IBackplane transport, ITagRegistrationManager registrationManager)
         {
             _transport = transport ?? throw new ArgumentNullException(nameof(transport));
             _registrationManager = registrationManager ?? throw new ArgumentNullException(nameof(registrationManager));

@@ -48,7 +48,7 @@ namespace Tiema.Runtime
                     {
                         grpcServer = new Server
                         {
-                            Services = { Backplane.BindService(new GrpcBackplaneServer()) },
+                            Services = { Backplane.BindService(new TiemaBackplaneServer()) },
                             Ports = { new ServerPort(bindHost, port, ServerCredentials.Insecure) }
                         };
                         grpcServer.Start();
