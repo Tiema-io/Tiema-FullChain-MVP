@@ -1,4 +1,3 @@
-
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -7,27 +6,26 @@ using System.Threading;
 using System.Threading.Tasks;
 using Tiema.Contracts;
 using Tiema.Hosting.Abstractions;
-using Tiema.Protocols.V1;
+using Tiema.Tags.Grpc.V1; // generated types from tagsystem.proto
 
 namespace Tiema.Runtime.Services
 {
     /// <summary>
-    /// 扫描模块上的 TiemaTagAttribute，完成注册并建立订阅/可选自动发布。
-    /// 在 TiemaHost.LoadModule 的 module.Initialize() 后调用。
-    /// 返回的 IDisposable 列表由宿主保存并在卸载时 Dispose。
+    /// Scan TiemaTagAttribute on plugin instances, register tags, wire subscriptions, and optional auto-publish.
+    /// Called after Initialize(IPluginContext) in TiemaHost.LoadModule. Returns disposables to be disposed on unload.
     /// </summary>
     public static class TagAutoRegistrar
     {
         public static IList<IDisposable> RegisterAndWire(
-            object moduleInstance,
-            IModuleContext moduleContext,
+            object pluginInstance,
+            IPluginContext pluginContext,
             ITagRegistrationManager regManager,
             ITagService tagService)
         {
             var disposables = new List<IDisposable>();
-            if (moduleInstance == null) return disposables;
+            if (pluginInstance == null) return disposables;
 
-            var type = moduleInstance.GetType();
+            var type = pluginInstance.GetType();
             var members = type.GetMembers(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
 
             var producers = new List<string>();
@@ -43,34 +41,33 @@ namespace Tiema.Runtime.Services
                 else consumers.Add(attr.Path);
             }
 
-            // 1) 注册（会走 InMemory 或 Grpc 实现）
-            // 使用 moduleContext.ModuleInstanceId 作为注册的 module/plugin id（LoadModule 时已生成）
-            var identities = regManager.RegisterModuleTags(moduleContext.ModuleInstanceId,
-                producers, consumers);
+            // 1) Registration (InMemory or gRPC implementation)
+            // Use pluginContext.PluginInstanceId for plugin id
+            var identities = regManager.RegisterModuleTags(pluginContext.PluginInstanceId, producers, consumers);
 
-            // 2) 通知内置 tagService 完成注册以便建立 consumer 订阅（若实现需）
+            // 2) Notify built-in tagService to subscribe consumers if needed
             if (tagService is BuiltInTagService builtIn)
             {
                 try { builtIn.OnTagsRegistered(identities); } catch { }
             }
 
-            // 3) 为 annotated consumers 建立订阅 -> 把更新写入成员或调用方法
+            // 3) For consumer tags, subscribe and write updates to members/methods
             foreach (var (member, attr) in annotated.Where(a => a.attr.Role == TagRole.Consumer))
             {
                 var path = attr.Path;
-                var sub = moduleContext.Tags.SubscribeTag(path, val =>
+                var sub = pluginContext.Tags.SubscribeTag(path, val =>
                 {
                     try
                     {
                         if (member is PropertyInfo pi && pi.CanWrite)
                         {
                             var converted = ConvertValueIfNeeded(val, pi.PropertyType);
-                            pi.SetValue(moduleInstance, converted);
+                            pi.SetValue(pluginInstance, converted);
                         }
                         else if (member is FieldInfo fi)
                         {
                             var converted = ConvertValueIfNeeded(val, fi.FieldType);
-                            fi.SetValue(moduleInstance, converted);
+                            fi.SetValue(pluginInstance, converted);
                         }
                         else if (member is MethodInfo mi)
                         {
@@ -79,7 +76,7 @@ namespace Tiema.Runtime.Services
                             {
                                 var pType = parameters[0].ParameterType;
                                 var converted = ConvertValueIfNeeded(val, pType);
-                                mi.Invoke(moduleInstance, new[] { converted });
+                                mi.Invoke(pluginInstance, new[] { converted });
                             }
                         }
                     }
@@ -92,7 +89,7 @@ namespace Tiema.Runtime.Services
                 disposables.Add(sub);
             }
 
-            // 4) 为 annotated producers 启动可选的周期自动 publish（读取成员并 SetTag）
+            // 4) For producer tags, start optional periodic auto-publish
             foreach (var (member, attr) in annotated.Where(a => a.attr.Role == TagRole.Producer && a.attr.AutoPublishIntervalMs > 0))
             {
                 var path = attr.Path;
@@ -107,13 +104,13 @@ namespace Tiema.Runtime.Services
                         try
                         {
                             object? value = null;
-                            if (member is PropertyInfo pi && pi.CanRead) value = pi.GetValue(moduleInstance);
-                            else if (member is FieldInfo fi) value = fi.GetValue(moduleInstance);
-                            else if (member is MethodInfo mi && mi.GetParameters().Length == 0) value = mi.Invoke(moduleInstance, null);
+                            if (member is PropertyInfo pi && pi.CanRead) value = pi.GetValue(pluginInstance);
+                            else if (member is FieldInfo fi) value = fi.GetValue(pluginInstance);
+                            else if (member is MethodInfo mi && mi.GetParameters().Length == 0) value = mi.Invoke(pluginInstance, null);
 
                             if (value != null)
                             {
-                                moduleContext.Tags.SetTag(path, value);
+                                pluginContext.Tags.SetTag(path, value);
                             }
                         }
                         catch { /* best-effort */ }

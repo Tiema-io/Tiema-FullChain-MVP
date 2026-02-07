@@ -3,7 +3,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using Tiema.Hosting.Abstractions;
-using Tiema.Protocols.V1;
+using Tiema.Tags.Grpc.V1;
 
 namespace Tiema.Runtime.Services
 {

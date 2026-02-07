@@ -1,29 +1,22 @@
-﻿//Tiema.Runtime/Program.cs 
+﻿// Tiema.Runtime/Program.cs
 using System;
 using System.IO;
 using System.Text.Json;
 using Tiema.Runtime.Models;
 using Grpc.Core;
-using Tiema.Runtime.Services;
-using Tiema.Protocols.V1;
+using Tiema.Connect.Grpc.V1; // DataConnect service
+using Tiema.DataConnect.Core; // generated from connect.proto (DataConnect)
+using static Tiema.Connect.Grpc.V1.DataConnect; // for BindService
 
 namespace Tiema.Runtime
 {
-    /// <summary>
-    /// 程序入口：负责启动 Tiema 容器并运行。
-    /// Program entry: responsible for creating and running the Tiema container.
-    /// </summary>
+    // Program entry: create and run the Tiema container.
     internal static class Program
     {
-        /// <summary>
-        /// 应用程序入口点（常见签名）。
-        /// Application entry point (common signature).
-        /// </summary>
-        /// <param name="args">命令行参数 / command-line arguments</param>
+        // Application entry point
         private static void Main(string[] args)
         {
-            // 启动横幅：同时显示中文名与英文名与简称（TB）
-            Console.WriteLine("=== Tiema 数据总线（Tiema Backplane, TB） v1.0 ===");
+            Console.WriteLine("=== Tiema DataConnect (MVP) ===");
 
             Server? grpcServer = null;
 
@@ -34,10 +27,10 @@ namespace Tiema.Runtime
                 var config = JsonSerializer.Deserialize<TiemaConfig>(json)
                              ?? throw new InvalidOperationException("Failed to load tiema.config.json");
 
-                // 构建 HostBuilder（先创建，后根据配置选择 backplane）
+                // Build HostBuilder then choose backplane per config
                 var hostBuilder = TiemaHostBuilder.Create(config);
 
-                // 如果配置启用 messaging 且选择了 grpc，则启动本地 gRPC Tiema 数据总线（TB）服务并把 client URL 注入到 HostBuilder
+                // If messaging enabled and transport=grpc, start local DataConnect and inject client URL
                 if (config.Messaging != null && config.Messaging.Enabled &&
                     string.Equals(config.Messaging.Transport, "grpc", StringComparison.OrdinalIgnoreCase))
                 {
@@ -48,42 +41,41 @@ namespace Tiema.Runtime
                     {
                         grpcServer = new Server
                         {
-                            Services = { Backplane.BindService(new TiemaBackplaneServer()) },
+                            Services = { BindService(new TiemaDataConnectServer()) },
                             Ports = { new ServerPort(bindHost, port, ServerCredentials.Insecure) }
                         };
                         grpcServer.Start();
-                        Console.WriteLine($"[INFO] Tiema 数据总线（Tiema Backplane, TB）服务已启动: {bindHost}:{port}");
+                        Console.WriteLine($"[INFO] DataConnect started: {bindHost}:{port}");
 
-                        // client 连接地址：若 bindHost 为 0.0.0.0 则使用 loopback 地址作为 client 目标
+                        // client target: use loopback when binding to 0.0.0.0
                         var clientHost = bindHost == "0.0.0.0" ? "127.0.0.1" : bindHost;
 
-                        // Grpc.Net.Client 需要带 scheme 的地址（例如 http://host:port）
+                        // Grpc.Net.Client requires scheme
                         var grpcUrl = $"http://{clientHost}:{port}";
 
                         hostBuilder = hostBuilder.UseGrpcBackplane(grpcUrl);
-                        Console.WriteLine($"[INFO] HostBuilder 已配置为使用 TB（Tiema 数据总线）地址: {grpcUrl}");
-                        Console.WriteLine("[INFO] 术语说明：Tiema 数据总线 = Tiema Backplane (TB)");
+                        Console.WriteLine($"[INFO] HostBuilder configured to use DataConnect at: {grpcUrl}");
                     }
                     catch (Exception ex)
                     {
-                        Console.WriteLine($"[WARN] 启动 Tiema 数据总线（TB）失败: {ex.Message}");
-                        // 如果 server 启动失败，不中断主流程；HostBuilder 不注入 gRPC backplane，继续使用默认（InMemory）
+                        Console.WriteLine($"[WARN] Failed to start DataConnect: {ex.Message}");
+                        // Fallback: do not inject gRPC backplane, continue with default (InMemory)
                     }
                 }
                 else
                 {
-                    // 如果显式配置为 inmemory，或未启用 messaging，使用 InMemoryBackplane（宿主级选择）
-                    if (config.Messaging == null || !config.Messaging.Enabled || string.Equals(config.Messaging.Transport, "inmemory", StringComparison.OrdinalIgnoreCase))
+                    // If messaging disabled or explicitly inmemory, use InMemory backplane
+                    if (config.Messaging == null || !config.Messaging.Enabled ||
+                        string.Equals(config.Messaging.Transport, "inmemory", StringComparison.OrdinalIgnoreCase))
                     {
                         hostBuilder = hostBuilder.UseInMemoryBackplane();
-                        Console.WriteLine("[INFO] HostBuilder 已配置为使用 InMemory 后台总线（仅用于本地调试）");
+                        Console.WriteLine("[INFO] HostBuilder configured to use InMemory backplane (local debug only)");
                     }
                 }
 
-                // 使用 HostBuilder 构建并运行 Host
                 var host = hostBuilder.Build();
 
-                host.LoadModules();
+                host.LoadPlugins();
                 host.Run();
             }
             catch (Exception ex)
@@ -93,17 +85,17 @@ namespace Tiema.Runtime
             }
             finally
             {
-                // 优雅关闭 gRPC 服务（同步等待）
+                // Gracefully shutdown gRPC service
                 if (grpcServer != null)
                 {
                     try
                     {
-                        Console.WriteLine("[INFO] 正在关闭 Tiema 数据总线（TB）服务...");
+                        Console.WriteLine("[INFO] Shutting down DataConnect...");
                         grpcServer.ShutdownAsync().Wait(TimeSpan.FromSeconds(5));
                     }
                     catch (Exception ex)
                     {
-                        Console.WriteLine($"[WARN] 关闭 Tiema 数据总线（TB）失败: {ex.Message}");
+                        Console.WriteLine($"[WARN] Shutdown DataConnect failed: {ex.Message}");
                     }
                 }
             }

@@ -14,8 +14,8 @@ namespace Tiema.Runtime.Models
         [JsonPropertyName("container")]
         public ContainerConfig Container { get; set; } = new ContainerConfig();
 
-        [JsonPropertyName("modules")]
-        public List<ModuleConfig> Modules { get; set; } = new();
+        [JsonPropertyName("plugins")]
+        public List<PluginConfig> Plugins { get; set; } = new();
 
         [JsonPropertyName("racks")]
         public List<RackConfig> Racks { get; set; } = new();

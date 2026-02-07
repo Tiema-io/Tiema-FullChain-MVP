@@ -1,0 +1,18 @@
+﻿// connect.proto
+// Tiema DataConnect RPCs (MVP) - RegisterTags / Publish / Subscribe / GetLastValue
+
+syntax = "proto3";
+
+package tiema.protocols.v1;
+
+option csharp_namespace = "Tiema.Connect.Grpc.V1";
+//option go_package = "github.com/tiema-io/platform/connect/v1";
+
+import "protos/tiema/v1/tagsystem.proto";
+// Service name unified to DataConnect for clarity and branding.
+service DataConnect {
+  rpc Publish (PublishRequest) returns (PublishResponse);
+  rpc GetLastValue (GetRequest) returns (GetResponse);
+  rpc Subscribe (SubscribeRequest) returns (stream Update);
+  rpc RegisterTags (RegisterTagsRequest) returns (RegisterTagsResponse);
+}

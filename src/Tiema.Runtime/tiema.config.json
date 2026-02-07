@@ -6,7 +6,7 @@
     "maxConcurrentCycles": 5,
     "logLevel": "Information"
   },
-  "modules": [
+  "plugins": [
     {
       "name": "ModbusSensor",
       "path": "../../../../plugins/net10.0/ModbusSensor.dll",

@@ -1,0 +1,67 @@
+name: CI - Tiema DataConnect Service
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  build-and-smoke:
+    runs-on: ubuntu-latest
+    env:
+      DATACONNECT_PORT: 50051
+      DATACONNECT_HOST: 127.0.0.1
+      # 兼容旧变量名（短期保留）
+      TB_PORT: 50051
+      TB_HOST: 127.0.0.1
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Restore
+        run: dotnet restore
+
+      - name: Build (Release)
+        run: dotnet build --configuration Release --no-restore
+
+      - name: Start Tiema.DataConnect.Service (background)
+        run: |
+          dotnet run --project src/Tiema.DataConnect.Service --configuration Release --no-build & echo $! > dc.pid
+          echo "Started DataConnect server, pid: $(cat dc.pid)"
+      
+      - name: Wait for port
+        run: |
+          PORT=${{ env.DATACONNECT_PORT }}
+          echo "Waiting for DataConnect port ${PORT}..."
+          for i in {1..20}; do
+            ss -ltn | grep -q ":${PORT}" && { echo "Port ${PORT} is listening"; break; }
+            sleep 1
+            echo "waiting..."
+          done
+
+      - name: Run smoke test
+  
+        run: dotnet run --project tests/Tiema.DataConnect.SmokeTest --configuration Release --no-build
+        continue-on-error: false
+
+      - name: Publish logs (optional)
+        if: failure()
+        run: |
+          if [ -f dc.pid ]; then
+            echo "Server PID: $(cat dc.pid)"
+            ps -ef | grep $(cat dc.pid) || true
+          fi
+
+      - name: Stop DataConnect server
+        if: always()
+        run: |
+          if [ -f dc.pid ]; then
+            kill "$(cat dc.pid)" || true
+            rm -f dc.pid
+            echo "Stopped DataConnect server"
+          fi

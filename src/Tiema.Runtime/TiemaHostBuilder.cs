@@ -1,5 +1,7 @@
 using System;
+
 using Tiema.Contracts;
+using Tiema.DataConnect.Core;
 using Tiema.Hosting.Abstractions;
 using Tiema.Runtime.Models;
 using Tiema.Runtime.Services;
@@ -114,12 +116,12 @@ namespace Tiema.Runtime
             else if (!string.IsNullOrEmpty(_grpcBackplaneUrl))
             {
                 // Create a GrpcBackplaneTransport (client). Real gRPC implementation can replace this class.
-                backplane = new TiemaBackplaneTransport(_grpcBackplaneUrl);
+                backplane = new TiemaDataConnectTransport(_grpcBackplaneUrl);
 
                 // 如果用户未显式提供 registration manager，则为 gRPC 模式创建远端注册管理器
                 if (tagRegistrationManager == null)
                 {
-                    tagRegistrationManager = new TiemaBackplaneTagRegistrationManager(_grpcBackplaneUrl);
+                    tagRegistrationManager = new TiemaDataConnectTagRegistrationManager(_grpcBackplaneUrl);
                 }
             }
             else

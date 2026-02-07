@@ -8,7 +8,7 @@ namespace SimpleAlarm
     /// 报警插件：订阅高温报警并记录/标记告警状态（在 Initialize 中订阅，内部循环检查状态）。
     /// Alarm plugin: subscribes to high-temp alarms and records/flags alarm state (subscribe in Initialize, internal loop checks state).
     /// </summary>
-    public class SimpleAlarmModule : ModuleBase
+    public class SimpleAlarmModule : PluginBase
     {
         /// <summary>
         /// 插件名称 / Plugin name

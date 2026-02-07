@@ -4,32 +4,29 @@ using System.Collections.Generic;
 using System.Linq;
 using Grpc.Core;
 using Tiema.Hosting.Abstractions;
-using Tiema.Protocols.V1;
+using Tiema.Tags.Grpc.V1;        // tagsystem.proto C# namespace
+using Tiema.Connect.Grpc.V1;
+using static Tiema.Connect.Grpc.V1.DataConnect;     // connect.proto C# namespace
 
-namespace Tiema.Runtime.Services
+namespace Tiema.DataConnect.Core
 {
     /// <summary>
-    /// gRPC 版的 ITagRegistrationManager：把 RegisterModuleTags 转发到远端 Backplane 的 RegisterTags RPC，
-    /// 并在本地缓存返回的 identities 以支持 GetByHandle/GetByPath 查询。
+    /// gRPC-based ITagRegistrationManager: forwards RegisterTags to remote DataConnect and caches TagIdentity.
     /// </summary>
-    public sealed class TiemaBackplaneTagRegistrationManager : ITagRegistrationManager, IDisposable
+    public sealed class TiemaDataConnectTagRegistrationManager : ITagRegistrationManager, IDisposable
     {
-        private readonly Backplane.BackplaneClient _client;
+        private readonly DataConnectClient _client;
         private readonly Channel _channel;
         private readonly ConcurrentDictionary<uint, TagIdentity> _byHandle = new();
         private readonly ConcurrentDictionary<string, TagIdentity> _byPath = new(StringComparer.OrdinalIgnoreCase);
         private bool _disposed;
 
-        public TiemaBackplaneTagRegistrationManager(string grpcUrl)
+        public TiemaDataConnectTagRegistrationManager(string grpcUrl)
         {
             if (string.IsNullOrWhiteSpace(grpcUrl)) throw new ArgumentNullException(nameof(grpcUrl));
 
-            // Accept both forms:
-            // - "host:port" (legacy Grpc.Core.Channel style)
-            // - "http://host:port" or "https://host:port" (Grpc.Net.Client style)
-            // Normalize to host:port for Grpc.Core.Channel.
+            // Accept "host:port" and "http(s)://host:port"; normalize to host:port for Grpc.Core.Channel.
             string target = grpcUrl.Trim();
-
             if (Uri.TryCreate(target, UriKind.Absolute, out var uri) &&
                 (string.Equals(uri.Scheme, "http", StringComparison.OrdinalIgnoreCase) ||
                  string.Equals(uri.Scheme, "https", StringComparison.OrdinalIgnoreCase)))
@@ -40,19 +37,20 @@ namespace Tiema.Runtime.Services
             }
 
             _channel = new Channel(target, ChannelCredentials.Insecure);
-            _client = new Backplane.BackplaneClient(_channel);
+            _client = new DataConnectClient(_channel);
         }
 
         public IReadOnlyList<TagIdentity> RegisterModuleTags(string moduleInstanceId, IEnumerable<string> producerPaths, IEnumerable<string> consumerPaths)
         {
-            if (_disposed) throw new ObjectDisposedException(nameof(TiemaBackplaneTagRegistrationManager));
-            // 对应 proto: RegisterTagsRequest.module_instance_id
-            var req = new RegisterTagsRequest { ModuleInstanceId = moduleInstanceId ?? string.Empty };
+            if (_disposed) throw new ObjectDisposedException(nameof(TiemaDataConnectTagRegistrationManager));
+
+            // Use plugin terminology in proto: RegisterTagsRequest.plugin_instance_id
+            var req = new RegisterTagsRequest { PluginInstanceId = moduleInstanceId ?? string.Empty };
 
             foreach (var p in producerPaths ?? Enumerable.Empty<string>())
             {
                 if (string.IsNullOrWhiteSpace(p)) continue;
-                // 对应 proto: RegisterTagInfo.tag_path
+                // RegisterTagInfo.tag_path + role
                 req.Tags.Add(new RegisterTagInfo { TagPath = p, Role = TagRole.Producer });
             }
 
@@ -70,11 +68,11 @@ namespace Tiema.Runtime.Services
                 {
                     foreach (var a in resp.Assigned)
                     {
-                        // 对应 proto 字段名：tag_path / source_module_instance_id / reference_module_instance_id
+                        // Assigned fields: tag_path / source_plugin_instance_id
                         var path = a.TagPath ?? string.Empty;
                         var role = a.Role;
                         var handle = a.Handle;
-                        var src = a.SourceModuleInstanceId ?? moduleInstanceId ?? string.Empty;
+                        var src = a.SourcePluginInstanceId ?? moduleInstanceId ?? string.Empty;
 
                         var identity = new TagIdentity(handle, path, role, src);
 
@@ -87,20 +85,17 @@ namespace Tiema.Runtime.Services
             }
             catch (RpcException rex)
             {
-                Console.WriteLine($"[WARN] GrpcTagRegistrationManager.RegisterModuleTags RPC failed: {rex.Status.Detail}");
+                Console.WriteLine($"[WARN] TagRegistrationManager.RegisterModuleTags RPC failed: {rex.Status.Detail}");
                 return Array.Empty<TagIdentity>();
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[WARN] GrpcTagRegistrationManager.RegisterModuleTags failed: {ex.Message}");
+                Console.WriteLine($"[WARN] TagRegistrationManager.RegisterModuleTags failed: {ex.Message}");
                 return Array.Empty<TagIdentity>();
             }
         }
 
-        public TagIdentity? GetByHandle(uint handle)
-        {
-            return _byHandle.TryGetValue(handle, out var id) ? id : null;
-        }
+        public TagIdentity? GetByHandle(uint handle) => _byHandle.TryGetValue(handle, out var id) ? id : null;
 
         public TagIdentity? GetByPath(string path)
         {
@@ -112,11 +107,7 @@ namespace Tiema.Runtime.Services
         {
             if (_disposed) return;
             _disposed = true;
-            try
-            {
-                _channel?.ShutdownAsync().Wait(TimeSpan.FromSeconds(2));
-            }
-            catch { }
+            try { _channel?.ShutdownAsync().Wait(TimeSpan.FromSeconds(2)); } catch { }
         }
     }
 }

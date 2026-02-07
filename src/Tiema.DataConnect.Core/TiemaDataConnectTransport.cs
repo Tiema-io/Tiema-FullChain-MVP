@@ -9,79 +9,62 @@ using Grpc.Net.Client;
 using Google.Protobuf.WellKnownTypes;
 using Google.Protobuf;
 using Tiema.Hosting.Abstractions;
-using Tiema.Protocols.V1;
+using Tiema.Tags.Grpc.V1;       // tagsystem.proto -> Tiema.Tags.Grpc.V1
+using Tiema.Connect.Grpc.V1;
+using static Tiema.Connect.Grpc.V1.DataConnect;    // connect.proto -> Tiema.Connect.Grpc.V1
 
-namespace Tiema.Runtime.Services
+namespace Tiema.DataConnect.Core
 {
     /// <summary>
-    /// gRPC Backplane 传输实现（Transport）：
-    /// - 同时实现 IBackplane（本地 CLR 语义）与 ITagTransport（protobuf/网络语义）;
-    /// - 传输层负责 RPC/序列化/流式订阅；高阶 Adapter 在此之上实现 assembly/周期逻辑。
+    /// gRPC DataConnect transport: implements IBackplane (CLR) and ITagTransport (protobuf).
     /// </summary>
-    public class TiemaBackplaneTransport : IBackplane, ITagTransport, IDisposable
+    public class TiemaDataConnectTransport : IBackplane, ITagTransport, IDisposable
     {
         private readonly GrpcChannel _channel;
-        private readonly Backplane.BackplaneClient _client;
+        private readonly DataConnectClient _client;
 
-        // 本地值回调复用（原实现）：handle -> SubscriptionGroup（返回 CLR object）
         private readonly ConcurrentDictionary<uint, SubscriptionGroup> _subscriptions = new();
-
-        // 原样 protobuf Update 回调（用于 ITagTransport.SubscribeTag/Batch）：handle -> RawSubscriptionGroup
         private readonly ConcurrentDictionary<uint, RawSubscriptionGroup> _rawSubscriptions = new();
 
         private bool _disposed;
 
-        public TiemaBackplaneTransport(string url)
+        public TiemaDataConnectTransport(string url)
         {
             if (string.IsNullOrWhiteSpace(url)) throw new ArgumentNullException(nameof(url));
             _channel = GrpcChannel.ForAddress(url);
-            _client = new Backplane.BackplaneClient(_channel);
+            _client = new DataConnectClient(_channel);
         }
 
-        // -----------------------
-        // IBackplane 实现（保留原有语义）
-        // -----------------------
-        // 替换 IBackplane.PublishAsync 的实现，构造 TagValue
         public async Task PublishAsync(uint handle, object value, CancellationToken ct = default)
         {
             EnsureNotDisposed();
 
-            // 构造 TagValue：使用 proto 新字段名（Timestamp, SourceModuleInstanceId）
             var tag = new TagValue
             {
                 Handle = handle,
                 Timestamp = Timestamp.FromDateTime(DateTime.UtcNow),
                 Quality = QualityCode.QualityUnknown,
-                SourceModuleInstanceId = string.Empty
+                SourcePluginInstanceId = string.Empty
             };
 
             switch (value)
             {
                 case bool b:
-                    tag.BoolValue = b;
-                    break;
+                    tag.BoolValue = b; break;
                 case int i:
-                    tag.IntValue = i;
-                    break;
+                    tag.IntValue = i; break;
                 case long l:
-                    tag.IntValue = l;
-                    break;
+                    tag.IntValue = l; break;
                 case double d:
-                    tag.DoubleValue = d;
-                    break;
+                    tag.DoubleValue = d; break;
                 case string s:
-                    tag.StringValue = s;
-                    break;
+                    tag.StringValue = s; break;
                 case byte[] bytes:
-                    tag.BytesValue = Google.Protobuf.ByteString.CopyFrom(bytes);
-                    break;
+                    tag.BytesValue = ByteString.CopyFrom(bytes); break;
                 case TagValue tv:
-                    tag = tv;
-                    break;
+                    tag = tv; break;
                 default:
-                    // fallback to string
-                    tag.StringValue = value?.ToString() ?? string.Empty;
-                    break;
+                    tag.StringValue = value?.ToString() ?? string.Empty; break;
             }
 
             var req = new PublishRequest { Tag = tag };
@@ -100,15 +83,11 @@ namespace Tiema.Runtime.Services
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[ERROR] GrpcBackplaneTransport.PublishAsync exception: {ex.Message}");
+                Console.WriteLine($"[ERROR] DataConnectTransport.PublishAsync exception: {ex.Message}");
                 throw;
             }
         }
 
-        /// <summary>
-        /// IBackplane.GetLastValueAsync：返回原样的 protobuf TagValue（object），不在传输层做强制解包。
-        /// 这样上层或 adapter 可以按需用 TagValueHelper/TryUnpack 做解包/转换。
-        /// </summary>
         public async Task<object?> GetLastValueAsync(uint handle, CancellationToken ct = default)
         {
             EnsureNotDisposed();
@@ -118,8 +97,6 @@ namespace Tiema.Runtime.Services
             {
                 var resp = await _client.GetLastValueAsync(req, cancellationToken: ct).ResponseAsync.ConfigureAwait(false);
                 if (resp == null || !resp.Found) return null;
-
-                // 返回 protobuf TagValue 原始对象（上层决定是否解包）
                 return resp.Value;
             }
             catch (RpcException ex) when (ex.StatusCode == StatusCode.NotFound)
@@ -128,7 +105,7 @@ namespace Tiema.Runtime.Services
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[ERROR] GrpcBackplaneTransport.GetLastValueAsync exception: {ex.Message}");
+                Console.WriteLine($"[ERROR] DataConnectTransport.GetLastValueAsync exception: {ex.Message}");
                 throw;
             }
         }
@@ -136,7 +113,6 @@ namespace Tiema.Runtime.Services
         public IDisposable Subscribe(uint handle, Action<object> onUpdate)
         {
             EnsureNotDisposed();
-
             if (onUpdate == null) throw new ArgumentNullException(nameof(onUpdate));
 
             var group = _subscriptions.GetOrAdd(handle, h =>
@@ -145,60 +121,35 @@ namespace Tiema.Runtime.Services
                 g.Start();
                 return g;
             });
-
             return group.AddCallback(onUpdate);
         }
 
-        // -----------------------
-        // ITagTransport 实现（protobuf / 网络语义）
-        // -----------------------
         public async Task<RegisterTagsResponse> RegisterTagsAsync(RegisterTagsRequest request, CancellationToken ct = default)
         {
             EnsureNotDisposed();
 
             if (request == null)
             {
-                return new RegisterTagsResponse
-                {
-                    Success = false,
-                    Message = "null request"
-                };
+                return new RegisterTagsResponse { Success = false, Message = "null request" };
             }
 
             try
             {
-                // 直接透传 protobuf 的 RegisterTagsRequest 到远端 Backplane RPC（保持原样，避免不必要的映射）
                 var rpcCall = _client.RegisterTagsAsync(request, cancellationToken: ct);
                 var resp = await rpcCall.ResponseAsync.ConfigureAwait(false);
-
-                if (resp == null)
-                {
-                    return new RegisterTagsResponse
-                    {
-                        Success = false,
-                        Message = "null response from server"
-                    };
-                }
-
-                return resp;
+                return resp ?? new RegisterTagsResponse { Success = false, Message = "null response from server" };
             }
             catch (RpcException rex) when (rex.StatusCode == StatusCode.Cancelled || rex.StatusCode == StatusCode.DeadlineExceeded)
             {
-                // 上层可能需要感知取消/超时，继续抛出以便 caller 处理
                 throw;
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[ERROR] GrpcBackplaneTransport.RegisterTagsAsync exception: {ex.Message}");
-                return new RegisterTagsResponse
-                {
-                    Success = false,
-                    Message = ex.Message
-                };
+                Console.WriteLine($"[ERROR] DataConnectTransport.RegisterTagsAsync exception: {ex.Message}");
+                return new RegisterTagsResponse { Success = false, Message = ex.Message };
             }
         }
 
-        // ITagTransport.PublishTagAsync：直接发送 TagValue
         public async Task<PublishResponse> PublishTagAsync(TagValue tag, CancellationToken ct = default)
         {
             EnsureNotDisposed();
@@ -222,7 +173,6 @@ namespace Tiema.Runtime.Services
             EnsureNotDisposed();
             if (batch == null) throw new ArgumentNullException(nameof(batch));
 
-            // Simple implementation: publish each TagValue individually in parallel
             var tasks = new List<Task<PublishResponse>>();
             foreach (var tv in batch.Tags)
             {
@@ -231,12 +181,10 @@ namespace Tiema.Runtime.Services
 
             await Task.WhenAll(tasks).ConfigureAwait(false);
 
-            // Aggregate result: success if all Success
             var failed = tasks.Select(t => t.Result).FirstOrDefault(r => r == null || !r.Success);
             return failed ?? new PublishResponse { Success = true, Message = string.Empty };
         }
 
-        // 显式接口实现，避免与 IBackplane 的同名冲突：直接返回 protobuf GetResponse
         async Task<GetResponse> ITagTransport.GetLastValueAsync(uint handle, CancellationToken ct)
         {
             EnsureNotDisposed();
@@ -253,7 +201,7 @@ namespace Tiema.Runtime.Services
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[ERROR] GrpcBackplaneTransport.GetLastValueAsync (protobuf) exception: {ex.Message}");
+                Console.WriteLine($"[ERROR] DataConnectTransport.GetLastValueAsync (protobuf) exception: {ex.Message}");
                 throw;
             }
         }
@@ -279,43 +227,30 @@ namespace Tiema.Runtime.Services
             if (tags == null) throw new ArgumentNullException(nameof(tags));
             if (onUpdate == null) throw new ArgumentNullException(nameof(onUpdate));
 
-            // Build a SubscribeRequest if server supports batch subscribe (falls back to per-handle subscribe)
             var enumerated = tags.ToList();
             if (enumerated.Count == 1)
             {
                 return SubscribeTag(enumerated[0].Handle, onUpdate);
             }
 
-            // For simplicity, create a group per first handle and forward all updates
             var first = enumerated[0];
             return SubscribeTag(first.Handle, onUpdate);
         }
 
-        // -----------------------
-        // Helpers & conversion
-        // -----------------------
         private Any? ConvertToAny(object? value)
         {
             if (value == null) return null;
 
             switch (value)
             {
-                case IMessage msg:
-                    return Any.Pack(msg);
-                case int i:
-                    return Any.Pack(new Int32Value { Value = i });
-                case long l:
-                    return Any.Pack(new Int64Value { Value = l });
-                case double d:
-                    return Any.Pack(new DoubleValue { Value = d });
-                case float f:
-                    return Any.Pack(new DoubleValue { Value = f });
-                case bool b:
-                    return Any.Pack(new BoolValue { Value = b });
-                case string s:
-                    return Any.Pack(new StringValue { Value = s });
-                default:
-                    return Any.Pack(new StringValue { Value = value.ToString() ?? string.Empty });
+                case IMessage msg: return Any.Pack(msg);
+                case int i:        return Any.Pack(new Int32Value { Value = i });
+                case long l:       return Any.Pack(new Int64Value { Value = l });
+                case double d:     return Any.Pack(new DoubleValue { Value = d });
+                case float f:      return Any.Pack(new DoubleValue { Value = f });
+                case bool b:       return Any.Pack(new BoolValue { Value = b });
+                case string s:     return Any.Pack(new StringValue { Value = s });
+                default:           return Any.Pack(new StringValue { Value = value.ToString() ?? string.Empty });
             }
         }
 
@@ -325,56 +260,24 @@ namespace Tiema.Runtime.Services
 
             try
             {
-                if (any.Is(Int32Value.Descriptor))
-                {
-                    var v = any.Unpack<Int32Value>();
-                    return v.Value;
-                }
-                if (any.Is(Int64Value.Descriptor))
-                {
-                    var v = any.Unpack<Int64Value>();
-                    return v.Value;
-                }
-                if (any.Is(DoubleValue.Descriptor))
-                {
-                    var v = any.Unpack<DoubleValue>();
-                    return v.Value;
-                }
-                if (any.Is(BoolValue.Descriptor))
-                {
-                    var v = any.Unpack<BoolValue>();
-                    return v.Value;
-                }
-                if (any.Is(StringValue.Descriptor))
-                {
-                    var v = any.Unpack<StringValue>();
-                    return v.Value;
-                }
-                if (any.Is(Struct.Descriptor))
-                {
-                    var v = any.Unpack<Struct>();
-                    return v;
-                }
-                if (any.Is(TagValue.Descriptor))
-                {
-                    // if transport packed a TagValue, return it as TagValue instance
-                    var tv = any.Unpack<TagValue>();
-                    return tv;
-                }
-
-                // Unknown: return Any for caller to handle
+                if (any.Is(Int32Value.Descriptor))  return any.Unpack<Int32Value>().Value;
+                if (any.Is(Int64Value.Descriptor))  return any.Unpack<Int64Value>().Value;
+                if (any.Is(DoubleValue.Descriptor)) return any.Unpack<DoubleValue>().Value;
+                if (any.Is(BoolValue.Descriptor))   return any.Unpack<BoolValue>().Value;
+                if (any.Is(StringValue.Descriptor)) return any.Unpack<StringValue>().Value;
+                if (any.Is(Struct.Descriptor))      return any.Unpack<Struct>();
+                if (any.Is(TagValue.Descriptor))    return any.Unpack<TagValue>();
                 return any;
             }
             catch
             {
-                // best effort: return raw Any
                 return any;
             }
         }
 
         private void EnsureNotDisposed()
         {
-            if (_disposed) throw new ObjectDisposedException(nameof(TiemaBackplaneTransport));
+            if (_disposed) throw new ObjectDisposedException(nameof(TiemaDataConnectTransport));
         }
 
         public void Dispose()
@@ -382,29 +285,18 @@ namespace Tiema.Runtime.Services
             if (_disposed) return;
             _disposed = true;
 
-            foreach (var kv in _subscriptions)
-            {
-                try { kv.Value.Dispose(); } catch { }
-            }
+            foreach (var kv in _subscriptions) { try { kv.Value.Dispose(); } catch { } }
             _subscriptions.Clear();
 
-            foreach (var kv in _rawSubscriptions)
-            {
-                try { kv.Value.Dispose(); } catch { }
-            }
+            foreach (var kv in _rawSubscriptions) { try { kv.Value.Dispose(); } catch { } }
             _rawSubscriptions.Clear();
 
-            try
-            {
-                _channel?.Dispose();
-            }
-            catch { }
+            try { _channel?.Dispose(); } catch { }
         }
 
-        // -------- SubscriptionGroup: per-handle 本地值单流 + 本地 fan-out --------
         private sealed class SubscriptionGroup : IDisposable
         {
-            private readonly TiemaBackplaneTransport _parent;
+            private readonly TiemaDataConnectTransport _parent;
             private readonly uint _handle;
             private readonly ConcurrentDictionary<Guid, Action<object>> _callbacks = new();
             private CancellationTokenSource _cts = new();
@@ -412,7 +304,7 @@ namespace Tiema.Runtime.Services
             private AsyncServerStreamingCall<Update>? _call;
             private readonly object _startLock = new();
 
-            public SubscriptionGroup(TiemaBackplaneTransport parent, uint handle)
+            public SubscriptionGroup(TiemaDataConnectTransport parent, uint handle)
             {
                 _parent = parent;
                 _handle = handle;
@@ -438,7 +330,6 @@ namespace Tiema.Runtime.Services
                             var req = new SubscribeRequest { Handle = _handle, SubscriberId = Guid.NewGuid().ToString("N") };
                             _call = _parent._client.Subscribe(req, cancellationToken: _cts.Token);
                             var stream = _call.ResponseStream;
-                            // 处理 Update.Tag 或 Update.Batch
                             while (await stream.MoveNext(_cts.Token).ConfigureAwait(false))
                             {
                                 var upd = stream.Current;
@@ -446,37 +337,24 @@ namespace Tiema.Runtime.Services
                                 switch (upd.PayloadCase)
                                 {
                                     case Update.PayloadOneofCase.Tag:
-                                        val = upd.Tag; // TagValue instance
-                                        break;
+                                        val = upd.Tag; break;
                                     case Update.PayloadOneofCase.Batch:
-                                        val = upd.Batch; // TagBatch instance
-                                        break;
+                                        val = upd.Batch; break;
                                     default:
-                                        val = null;
-                                        break;
+                                        val = null; break;
                                 }
 
-                                // snapshot callbacks
                                 var cbs = _callbacks.Values.ToArray();
                                 foreach (var cb in cbs)
                                 {
-                                    try
-                                    {
-                                        cb(val);
-                                    }
-                                    catch (Exception ex)
-                                    {
-                                        Console.WriteLine($"[WARN] subscriber callback error: {ex.Message}");
-                                    }
+                                    try { cb(val); }
+                                    catch (Exception ex) { Console.WriteLine($"[WARN] subscriber callback error: {ex.Message}"); }
                                 }
                             }
                         }
-                        catch (OperationCanceledException) { /* expected on dispose */ }
-                        catch (RpcException rex) when (rex.StatusCode == StatusCode.Cancelled) { /* expected */ }
-                        catch (Exception ex)
-                        {
-                            Console.WriteLine($"[ERROR] SubscriptionGroup read loop error for handle={_handle}: {ex.Message}");
-                        }
+                        catch (OperationCanceledException) { }
+                        catch (RpcException rex) when (rex.StatusCode == StatusCode.Cancelled) { }
+                        catch (Exception ex) { Console.WriteLine($"[ERROR] SubscriptionGroup read loop error for handle={_handle}: {ex.Message}"); }
                     }, _cts.Token);
                 }
             }
@@ -486,7 +364,6 @@ namespace Tiema.Runtime.Services
                 _callbacks.TryRemove(id, out _);
                 if (_callbacks.IsEmpty)
                 {
-                    // no local consumers left: stop stream, remove from parent and dispose
                     Dispose();
                     _parent._subscriptions.TryRemove(_handle, out _);
                 }
@@ -494,35 +371,13 @@ namespace Tiema.Runtime.Services
 
             public void Dispose()
             {
-                try
-                {
-                    _cts.Cancel();
-                }
-                catch { }
-
-                try
-                {
-                    _call?.Dispose();
-                }
-                catch { }
-
-                try
-                {
-                    _readLoop?.Wait(1000);
-                }
-                catch { }
-
-                try
-                {
-                    _cts.Dispose();
-                }
-                catch { }
-
-                // clear callbacks
+                try { _cts.Cancel(); } catch { }
+                try { _call?.Dispose(); } catch { }
+                try { _readLoop?.Wait(1000); } catch { }
+                try { _cts.Dispose(); } catch { }
                 _callbacks.Clear();
             }
 
-            // small disposable returned to caller for per-callback unsubscribe
             private sealed class CallbackSubscription : IDisposable
             {
                 private readonly SubscriptionGroup _group;
@@ -545,10 +400,9 @@ namespace Tiema.Runtime.Services
             }
         }
 
-        // -------- RawSubscriptionGroup: per-handle protobuf Update 流的本地 fan-out（传递 Update 原始对象） --------
         private sealed class RawSubscriptionGroup : IDisposable
         {
-            private readonly TiemaBackplaneTransport _parent;
+            private readonly TiemaDataConnectTransport _parent;
             private readonly uint _handle;
             private readonly ConcurrentDictionary<Guid, Action<Update>> _callbacks = new();
             private CancellationTokenSource _cts = new();
@@ -556,7 +410,7 @@ namespace Tiema.Runtime.Services
             private AsyncServerStreamingCall<Update>? _call;
             private readonly object _startLock = new();
 
-            public RawSubscriptionGroup(TiemaBackplaneTransport parent, uint handle)
+            public RawSubscriptionGroup(TiemaDataConnectTransport parent, uint handle)
             {
                 _parent = parent;
                 _handle = handle;
@@ -584,28 +438,18 @@ namespace Tiema.Runtime.Services
                             var stream = _call.ResponseStream;
                             while (await stream.MoveNext(_cts.Token).ConfigureAwait(false))
                             {
-                                var upd = stream.Current; // protobuf Update
-                                // snapshot callbacks
+                                var upd = stream.Current;
                                 var cbs = _callbacks.Values.ToArray();
                                 foreach (var cb in cbs)
                                 {
-                                    try
-                                    {
-                                        cb(upd);
-                                    }
-                                    catch (Exception ex)
-                                    {
-                                        Console.WriteLine($"[WARN] raw subscriber callback error: {ex.Message}");
-                                    }
+                                    try { cb(upd); }
+                                    catch (Exception ex) { Console.WriteLine($"[WARN] raw subscriber callback error: {ex.Message}"); }
                                 }
                             }
                         }
-                        catch (OperationCanceledException) { /* expected on dispose */ }
-                        catch (RpcException rex) when (rex.StatusCode == StatusCode.Cancelled) { /* expected */ }
-                        catch (Exception ex)
-                        {
-                            Console.WriteLine($"[ERROR] RawSubscriptionGroup read loop error for handle={_handle}: {ex.Message}");
-                        }
+                        catch (OperationCanceledException) { }
+                        catch (RpcException rex) when (rex.StatusCode == StatusCode.Cancelled) { }
+                        catch (Exception ex) { Console.WriteLine($"[ERROR] RawSubscriptionGroup read loop error for handle={_handle}: {ex.Message}"); }
                     }, _cts.Token);
                 }
             }
@@ -623,13 +467,9 @@ namespace Tiema.Runtime.Services
             public void Dispose()
             {
                 try { _cts.Cancel(); } catch { }
-
                 try { _call?.Dispose(); } catch { }
-
                 try { _readLoop?.Wait(1000); } catch { }
-
                 try { _cts.Dispose(); } catch { }
-
                 _callbacks.Clear();
             }
 

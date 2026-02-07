@@ -2,7 +2,7 @@
 using System.Threading;
 using System.Threading.Tasks;
 using Tiema.Sdk;
-using Tiema.Protocols.V1;
+using Tiema.Tags.Grpc.V1;
 using Tiema.Contracts;     // TagRole for attribute
 
 namespace TemperatureLogic
@@ -10,7 +10,7 @@ namespace TemperatureLogic
     /// <summary>
     /// 逻辑处理插件：读取温度并在超限时发布高温报警消息（使用宿主 Tags 订阅）。
     /// </summary>
-    public class TemperatureLogicModule : ModuleBase
+    public class TemperatureLogicModule : PluginBase
     {
         public override string Name => "TemperatureLogic";
 

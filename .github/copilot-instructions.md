@@ -1,7 +1,7 @@
 # Copilot Instructions
 
 ## General Guidelines
-- Use bilingual Chinese-English comments in code and explanations by default.
+- Use English-only comments in code by default, unless a specific file requests bilingual Chinese-English comments.
 - Tiema 数据总线 (Tiema Backplane, TB) is an independent service as a unified data layer; any language can interoperate if it follows the protocol.
 - Architecture: keep single-process InMemory for debug; support multi-process with gRPC data plane and Named Pipe control plane; future: multiple hosts share a single or bridged Backplane across machines with namespaces, ACL, TLS.
 - Debugging: use unique ModuleInstanceId/pluginId, command-line args, and supervisor to manage and attach.
@@ -20,6 +20,7 @@
 ## Code Style
 - Follow specific formatting rules.
 - Maintain consistent naming conventions.
+- Update smoke test to use generated proto names: service renamed to TiemaBackplane -> client class TiemaBackplane.TiemaBackplaneClient. Enum names: use TagRole.Producer and QualityCode.QualityGood. Prefer generated property names like TagPath, ModuleInstanceId, SourceModuleInstanceId. Remember these proto-driven naming conventions for future code generation.
 
 ## Project-Specific Rules
 - Keep SimpleAlarm plugin's subscription-based demonstration; do not modify its subscription logic.

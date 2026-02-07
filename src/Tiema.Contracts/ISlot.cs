@@ -18,10 +18,10 @@ namespace Tiema.Contracts
 
 
         IRack Rack { get; }
-        IModule Module { get; }
+        IPlugin Plugin { get; }
 
         bool IsOccupied { get; }
-        bool Plug(IModule module);
+        bool Plug(IPlugin module);
         void Unplug();
 
      

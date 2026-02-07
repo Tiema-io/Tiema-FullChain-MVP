@@ -12,6 +12,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Tiema.Contracts\Tiema.Contracts.csproj" />
+    <ProjectReference Include="..\Tiema.DataConnect.Core\Tiema.DataConnect.Core.csproj" />
     <ProjectReference Include="..\Tiema.Hosting.Abstractions\Tiema.Hosting.Abstractions.csproj" />
     <ProjectReference Include="..\Tiema.Plugin.Sdk\Tiema.Sdk.csproj" />
   </ItemGroup>

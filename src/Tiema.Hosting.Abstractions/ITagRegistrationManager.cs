@@ -1,5 +1,6 @@
 ﻿using System.Collections.Generic;
-using Tiema.Protocols.V1;
+
+using Tiema.Tags.Grpc.V1;
 
 namespace Tiema.Hosting.Abstractions
 {

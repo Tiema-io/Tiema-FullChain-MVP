@@ -1,15 +1,22 @@
 <Solution>
-  <Folder Name="/docs/">
-    <File Path="API_Idemopotency.md" />
-    <File Path="GettingStarted.md" />
+  <Folder Name="/DevOps/">
+    <File Path=".github/workflows/backplane-service-ci.yml" />
+  </Folder>
+  <Folder Name="/docs/" />
+  <Folder Name="/docs/en/">
+    <File Path="API_Idempotency.en.md" />
+  </Folder>
+  <Folder Name="/docs/zh-CN/">
+    <File Path="docs/zh-CN/API_Idempotency.zh.md" />
   </Folder>
   <Folder Name="/plugins/" />
   <Folder Name="/scripts/">
     <File Path="scripts/build.ps1" />
   </Folder>
   <Folder Name="/src/">
-    <Project Path="src/Tiema.BackplaneService/Tiema.BackplaneService.csproj" Id="f4155090-3ebe-4deb-938f-0b7a038e541d" />
     <Project Path="src/Tiema.Contracts/Tiema.Contracts.csproj" />
+    <Project Path="src/Tiema.DataConnect.Core/Tiema.DataConnect.Core.csproj" />
+    <Project Path="src/Tiema.DataConnect.Service/Tiema.DataConnect.Service.csproj" />
     <Project Path="src/Tiema.Hosting.Abstractions/Tiema.Hosting.Abstractions.csproj" Id="cb068cb6-dc56-47a2-99c4-3381b2697e57" />
     <Project Path="src/Tiema.Plugin.Sdk/Tiema.Sdk.csproj" />
     <Project Path="src/Tiema.Protocols/Tiema.Protocols.csproj" Id="ecc19dbb-32a1-40d2-9ac0-36f13d6c499a" />
@@ -25,7 +32,11 @@
   <Folder Name="/src/Properties/">
     <File Path="AssemblyInfo.cs" />
   </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Tiema.Backplane.SmokeTest/Tiema.DataConnect.SmokeTest.csproj" Id="2f501653-4511-4ba6-9792-8eb8605f9890" />
+  </Folder>
   <Folder Name="/解决方案项/">
     <File Path="README.md" />
+    <File Path="README.zh.mc" />
   </Folder>
 </Solution>

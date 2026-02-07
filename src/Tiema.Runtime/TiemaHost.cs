@@ -4,7 +4,6 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading;
-
 using Tiema.Contracts;
 using Tiema.Hosting.Abstractions;
 using Tiema.Runtime.Models;
@@ -13,31 +12,27 @@ using Tiema.Runtime.Services;
 namespace Tiema.Runtime
 {
     /// <summary>
-    /// TiemaHost: core runtime hosting racks/slots/modules and unified service registry.
+    /// TiemaHost: core runtime hosting racks/slots/plugins and unified service registry.
     /// </summary>
-    public class TiemaHost : IModuleHost
+    public class TiemaHost : IPluginHost
     {
-        private readonly Dictionary<string, HostedModule> _modules = new();
+        private readonly Dictionary<string, HostedPlugin> _plugins = new();
         private readonly CancellationTokenSource _cts = new();
         private readonly TiemaConfig _config;
 
-        // 机架管理器与插槽管理器（内存实现）
-        // rack manager and slot manager (in-memory)
+        // Rack/slot managers (in-memory)
         private readonly IRackManager _rackManager;
         private readonly ISlotManager _slotManager;
 
-        // 统一的宿主级 ServiceRegistry（注入 rackManager 以支持按 slot name 查找）
-        // unified host-level service registry (injected with rackManager to resolve slot name)
+        // Unified host-level service registry
         private readonly SimpleServiceRegistry _services;
 
-        // 核心运行时服务：Tag / Message / Registration / Backplane
         // Core runtime services: Tag / Message / Registration / Backplane
         private readonly ITagRegistrationManager _tagRegistrationManager;
         private readonly IBackplane _backplane;
         private readonly ITagService _tagService;
         private readonly IMessageService _messageService;
 
-        // 只允许 TiemaHostBuilder 调用的内部构造函数
         // Internal ctor used only by TiemaHostBuilder.
         internal TiemaHost(
             TiemaConfig config,
@@ -62,7 +57,6 @@ namespace Tiema.Runtime
             _tagService             = tagService ?? throw new ArgumentNullException(nameof(tagService));
             _messageService         = messageService ?? throw new ArgumentNullException(nameof(messageService));
 
-            // 根据配置初始化机架与插槽，并注册 slot 参数
             InitializeRacksFromConfig();
         }
 
@@ -70,16 +64,16 @@ namespace Tiema.Runtime
         public ISlotManager Slots => _slotManager;
         public IServiceRegistry Services => _services;
 
-        // 内部类型：模块条目封装模块实例与其上下文
-        private class HostedModule
+        // Internal container entry for a hosted plugin
+        private class HostedPlugin
         {
-            public IModule Module { get; }
-            public DefaultModuleContext Context { get; }
+            public IPlugin Plugin { get; }
+            public DefaultPluginContext Context { get; }
             public List<IDisposable> AutoRegistrations { get; } = new();
 
-            public HostedModule(IModule module, DefaultModuleContext context)
+            public HostedPlugin(IPlugin plugin, DefaultPluginContext context)
             {
-                Module = module;
+                Plugin = plugin;
                 Context = context;
             }
         }
@@ -101,38 +95,29 @@ namespace Tiema.Runtime
                         {
                             if (slotCfg == null) continue;
 
-                            // prefer explicit id from config if provided; fallback to count if negative
                             var configuredId = slotCfg.Id >= 0 ? slotCfg.Id : -1;
                             var slotNameFromCfg = !string.IsNullOrEmpty(slotCfg.Name) ? slotCfg.Name : null;
                             ISlot? slot = null;
 
-                            // 1) 优先按 id 查找（如果配置里提供了 id）
                             if (configuredId >= 0)
                             {
                                 slot = rack.GetSlot(configuredId);
                                 if (slot != null && !string.IsNullOrEmpty(slotNameFromCfg))
                                 {
-                                    // 更新显示标签（name）以匹配配置
                                     (slot as SimpleSlot)?.SetName(slotNameFromCfg);
                                 }
                             }
 
-                            // 2) 若未按 id 找到，尝试按 name 查找（兼容旧风格）
                             if (slot == null && !string.IsNullOrEmpty(slotNameFromCfg))
                             {
                                 slot = rack.GetSlot(slotNameFromCfg);
                             }
 
-                            // 3) 若还未找到且 rack 支持创建（且配置提供 id 或我们允许按顺序创建），则创建槽
                             if (slot == null && rack is SimpleRack sr)
                             {
-                                // 决定使用的 id：
-                                // - 如果配置提供了 id 则使用它；
-                                // - 否则如果 name 对应的 id 不存在，则使用当前最大 id+1（保持连续，但不会 collide）。
                                 var createId = configuredId >= 0 ? configuredId : (sr.AllSlots.Any() ? sr.AllSlots.Max(s => (s as SimpleSlot)?.Id ?? 0) + 1 : 0);
                                 var createName = slotNameFromCfg ?? $"slot-{createId}";
 
-                                // 如果 id 已存在（并发或先前创建），取回现有并更新 name
                                 var existing = sr.GetSlot(createId);
                                 if (existing != null)
                                 {
@@ -148,7 +133,6 @@ namespace Tiema.Runtime
 
                             if (slot == null) continue;
 
-                            // 注册 slot 参数到 registry：使用 slot.Id（若实现为 SimpleSlot）为主键
                             if (slotCfg.Parameters != null)
                             {
                                 foreach (var kv in slotCfg.Parameters)
@@ -161,7 +145,7 @@ namespace Tiema.Runtime
                                     }
                                     catch (Exception ex)
                                     {
-                                        Console.WriteLine($"[WARN] 注册插槽参数到 registry 失败: {rackCfg.Name}/{slot.Name} - {ex.Message}");
+                                        Console.WriteLine($"[WARN] Register slot param failed: {rackCfg.Name}/{slot.Name} - {ex.Message}");
                                     }
                                 }
                             }
@@ -177,7 +161,6 @@ namespace Tiema.Runtime
                     }
                     else if (rackCfg.SlotCount > 0)
                     {
-                        // 对于只指定 slotCount 的情况：确保 id 0..slotCount-1 的槽存在并设置默认 name
                         if (rack is SimpleRack sr)
                         {
                             for (int i = 0; i < rackCfg.SlotCount; i++)
@@ -195,7 +178,6 @@ namespace Tiema.Runtime
                         }
                         else
                         {
-                            // 如果 rack 不支持按 id 创建，则按现有行为按名称创建（较少见）
                             for (int i = 0; i < rackCfg.SlotCount; i++)
                             {
                                 var defaultName = $"slot-{i}";
@@ -212,20 +194,16 @@ namespace Tiema.Runtime
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"[WARN] 初始化机架失败: {rackCfg.Name} - {ex.Message}");
+                    Console.WriteLine($"[WARN] Initialize rack failed: {rackCfg.Name} - {ex.Message}");
                 }
             }
         }
 
-        /// <summary>
-        /// 运行容器并阻塞直到 Stop 被调用。
-        /// Run the host and block until Stop is called.
-        /// </summary>
+        // Run the host and block until Stop is called.
         public void Run()
         {
-            Console.WriteLine("Container running. Press Ctrl+C to stop. / Container running.");
+            Console.WriteLine("Container running. Press Ctrl+C to stop.");
 
-            // 捕获 Ctrl+C，触发 Stop（且不立即终止进程）
             Console.CancelKeyPress += (s, e) =>
             {
                 e.Cancel = true;
@@ -235,36 +213,33 @@ namespace Tiema.Runtime
 
             try
             {
-                // 阻塞直到 Stop() 被调用（通过 CancellationToken 信号）
                 _cts.Token.WaitHandle.WaitOne();
             }
             finally
             {
-                // 优雅停止：先尝试拔出所有模块，再 Stop
-                var moduleIds = _modules.Keys.ToList();
-                foreach (var id in moduleIds)
+                var pluginIds = _plugins.Keys.ToList();
+                foreach (var id in pluginIds)
                 {
                     try
                     {
-                        UnplugModule(id);
+                        UnplugPlugin(id);
                     }
                     catch (Exception ex)
                     {
-                        Console.WriteLine($"[ERROR] 卸载模块 {id} 失败: {ex.Message}");
+                        Console.WriteLine($"[ERROR] Unplug plugin {id} failed: {ex.Message}");
                     }
                 }
 
-                foreach (var entry in _modules.Values.ToList())
+                foreach (var entry in _plugins.Values.ToList())
                 {
                     try
                     {
-                        entry.Module.Stop();
-                        // dispose any auto-registrations remaining
+                        entry.Plugin.Stop();
                         foreach (var d in entry.AutoRegistrations) try { d.Dispose(); } catch { }
                     }
                     catch (Exception ex)
                     {
-                        Console.WriteLine($"[ERROR] 停止模块 {entry.Module.Name} 失败: {ex.Message}");
+                        Console.WriteLine($"[ERROR] Stop plugin {entry.Plugin.Name} failed: {ex.Message}");
                     }
                 }
 
@@ -281,38 +256,34 @@ namespace Tiema.Runtime
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[ERROR] Stop 触发取消时异常: {ex.Message}");
+                Console.WriteLine($"[ERROR] Stop cancellation error: {ex.Message}");
             }
         }
 
-        /// <summary>
-        /// 从配置批量加载模块（兼容遗留 slotIndex 配置：会转换为 slotId）。
-        /// Load modules from configuration (legacy slotIndex converted to slotId).
-        /// </summary>
-        public void LoadModules()
+        // Load plugins from configuration (legacy slotIndex converted to slotId).
+        public void LoadPlugins()
         {
-            if (_config.Modules == null || _config.Modules.Count == 0)
+            if (_config.Plugins == null || _config.Plugins.Count == 0)
             {
-                Console.WriteLine("配置中没有找到模块 / No modules configured");
+                Console.WriteLine("No plugins configured");
                 return;
             }
 
-            foreach (var cfg in _config.Modules)
+            foreach (var cfg in _config.Plugins)
             {
                 if (!cfg.Enabled)
                 {
-                    Console.WriteLine($"跳过禁用模块: {cfg.Name} / Skipping disabled module: {cfg.Name}");
+                    Console.WriteLine($"Skipping disabled plugin: {cfg.Name}");
                     continue;
                 }
 
                 try
                 {
-                    var moduleId = LoadModule(cfg.Path);
-                    if (!string.IsNullOrEmpty(moduleId))
+                    var pluginId = LoadPlugin(cfg.Path);
+                    if (!string.IsNullOrEmpty(pluginId))
                     {
-                        Console.WriteLine($"已加载模块: {cfg.Name} ({moduleId}) / Loaded module");
+                        Console.WriteLine($"Loaded plugin: {cfg.Name} ({pluginId})");
 
-                        // 兼容：优先接受 slotId 字段（整数或字符串数字），也兼容老 slotIndex 字段
                         if (cfg.Configuration != null &&
                             cfg.Configuration.TryGetValue("rack", out var rackObj) &&
                             (cfg.Configuration.TryGetValue("slotId", out var slotIdObj) || cfg.Configuration.TryGetValue("slotIndex", out slotIdObj)))
@@ -320,40 +291,36 @@ namespace Tiema.Runtime
                             var rackName = rackObj?.ToString() ?? string.Empty;
                             if (int.TryParse(slotIdObj?.ToString(), out var slotId))
                             {
-                                // optional slotName is just a label, not used to create slot
                                 var slotName = cfg.Configuration.TryGetValue("slotName", out var slotNameObj) ? slotNameObj?.ToString() : null;
-                                var ok = PlugModuleToSlot(moduleId, rackName, slotId, slotName);
+                                var ok = PlugPluginToSlot(pluginId, rackName, slotId, slotName);
                                 Console.WriteLine(ok
-                                    ? $"Module {moduleId} plugged to {rackName}/id:{slotId}"
-                                    : $"Module {moduleId} failed to plug to {rackName}/id:{slotId} (slot must pre-exist)");
+                                    ? $"Plugin {pluginId} plugged to {rackName}/id:{slotId}"
+                                    : $"Plugin {pluginId} failed to plug to {rackName}/id:{slotId} (slot must pre-exist)");
                             }
                         }
                     }
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"[ERROR] 批量加载模块失败: {cfg.Name}, 路径: {cfg.Path} / Failed to load module: {ex}");
+                    Console.WriteLine($"[ERROR] Load plugin failed: {cfg.Name}, path: {cfg.Path} - {ex}");
                 }
             }
 
-            Console.WriteLine($"total {_modules.Count} modules");
+            Console.WriteLine($"total {_plugins.Count} plugins");
         }
 
-        /// <summary>
-        /// 单模块加载：实例化模块并 Initialize/Start（不自动插槽）。
-        /// Load a single module: instantiate, Initialize and Start (does not auto-plug).
-        /// </summary>
-        public string LoadModule(string modulePath)
+        // Load a single plugin: instantiate, Initialize and Start (does not auto-plug).
+        public string LoadPlugin(string pluginPath)
         {
-            if (string.IsNullOrWhiteSpace(modulePath))
+            if (string.IsNullOrWhiteSpace(pluginPath))
             {
-                Console.WriteLine("LoadModule: modulePath 为空 / modulePath is empty");
+                Console.WriteLine("LoadPlugin: pluginPath is empty");
                 return string.Empty;
             }
 
             try
             {
-                var resolvedPath = modulePath;
+                var resolvedPath = pluginPath;
                 if (!Path.IsPathRooted(resolvedPath))
                 {
                     resolvedPath = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, resolvedPath));
@@ -361,32 +328,28 @@ namespace Tiema.Runtime
 
                 if (!File.Exists(resolvedPath))
                 {
-                    Console.WriteLine($"模块文件不存在，跳过: {resolvedPath} / Module file not found, skipping");
+                    Console.WriteLine($"Plugin file not found, skipping: {resolvedPath}");
                     return string.Empty;
                 }
 
-                var moduleInstance = ModuleLoader.Load(resolvedPath);
-                if (moduleInstance == null)
+                var pluginInstance = PluginLoader.Load(resolvedPath);
+                if (pluginInstance == null)
                 {
-                    Console.WriteLine($"未能实例化模块: {resolvedPath} / Failed to instantiate module");
+                    Console.WriteLine($"Failed to instantiate plugin: {resolvedPath}");
                     return string.Empty;
                 }
 
-                // 先生成 moduleId，再构造 DefaultModuleContext（新的构造函数需要 moduleInstanceId）
-                var moduleId = $"{moduleInstance.Name}_{Guid.NewGuid():N}".Substring(0, 20);
-                var moduleContext = new DefaultModuleContext(this, moduleId, _tagService, _messageService, _services);
+                var pluginId = $"{pluginInstance.Name}_{Guid.NewGuid():N}".Substring(0, 20);
+                var pluginContext = new DefaultPluginContext(this, pluginId, _tagService, _messageService, _services);
 
-                // 保存模块条目（保证在 Initialize/Declare 时能通过 moduleId 找到上下文/状态）
-                var hosted = new HostedModule(moduleInstance, moduleContext);
-                _modules[moduleId] = hosted;
+                var hosted = new HostedPlugin(pluginInstance, pluginContext);
+                _plugins[pluginId] = hosted;
 
-                // 调用模块初始化（模块的 DeclareProducer/DeclareConsumer 会通过 Context 立即注册）
-                moduleInstance.Initialize(moduleContext);
+                pluginInstance.Initialize(pluginContext);
 
-                // 使用 TagAutoRegistrar 进行集中注册并自动建立订阅/发布 wiring（幂等）
                 try
                 {
-                    var disposables = TagAutoRegistrar.RegisterAndWire(moduleInstance, moduleContext, _tagRegistrationManager, _tagService);
+                    var disposables = TagAutoRegistrar.RegisterAndWire(pluginInstance, pluginContext, _tagRegistrationManager, _tagService);
                     if (disposables != null && disposables.Count > 0)
                     {
                         hosted.AutoRegistrations.AddRange(disposables);
@@ -394,46 +357,39 @@ namespace Tiema.Runtime
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"[WARN] TagAutoRegistrar failed for module {moduleId}: {ex.Message}");
+                    Console.WriteLine($"[WARN] TagAutoRegistrar failed for plugin {pluginId}: {ex.Message}");
                 }
 
-                // 启动模块（Start 可能会立即进入 Execute 循环）
-                moduleInstance.Start();
+                pluginInstance.Start();
 
-                return moduleId;
+                return pluginId;
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[ERROR] 加载模块失败: {modulePath} / Failed to load module: {ex}");
+                Console.WriteLine($"[ERROR] Load plugin failed: {pluginPath} - {ex}");
                 return string.Empty;
             }
         }
 
-        /// <summary>
-        /// 将已加载的模块插入到指定的 rack/slot（按 slotId 查找或创建）。
-        /// Plug a loaded module into the slot identified by slotId (lookup by id).
-        /// 若槽不存在且机架支持创建（SimpleRack），则以 slotId 创建新槽，name 可选用于标签。
-        /// </summary>
-        public bool PlugModuleToSlot(string moduleId, string rackName, int slotId, string? slotName = null)
+        // Plug a loaded plugin into a slot identified by slotId (lookup by id).
+        public bool PlugPluginToSlot(string pluginId, string rackName, int slotId, string? slotName = null)
         {
-            if (string.IsNullOrEmpty(moduleId)) return false;
-            if (!_modules.TryGetValue(moduleId, out var entry))
+            if (string.IsNullOrEmpty(pluginId)) return false;
+            if (!_plugins.TryGetValue(pluginId, out var entry))
             {
-                Console.WriteLine($"[DEBUG] PlugModuleToSlot: moduleId not found: {moduleId}");
+                Console.WriteLine($"[DEBUG] PlugPluginToSlot: pluginId not found: {pluginId}");
                 return false;
             }
 
-            Console.WriteLine($"[DEBUG] PlugModuleToSlot: try plug moduleId={moduleId}, moduleType={entry.Module.GetType().FullName}, rack={rackName}, slotId={slotId}, slotName={slotName}");
+            Console.WriteLine($"[DEBUG] PlugPluginToSlot: try plug pluginId={pluginId}, type={entry.Plugin.GetType().FullName}, rack={rackName}, slotId={slotId}, slotName={slotName}");
 
-            // 1) 检查机架是否存在（严格，不创建）
             var rack = Racks.GetRack(rackName);
             if (rack == null)
             {
-                Console.WriteLine($"[ERROR] PlugModuleToSlot: rack '{rackName}' not found (will NOT create).");
+                Console.WriteLine($"[ERROR] PlugPluginToSlot: rack '{rackName}' not found");
                 return false;
             }
 
-            // 2) 按 id 查找插槽（严格，不创建）
             ISlot? slot = null;
             try
             {
@@ -441,7 +397,6 @@ namespace Tiema.Runtime
             }
             catch
             {
-                // 如果实现抛出，则尝试按名称解析（兼容），但不会创建
                 if (!string.IsNullOrEmpty(slotName))
                 {
                     slot = rack.GetSlot(slotName);
@@ -450,48 +405,42 @@ namespace Tiema.Runtime
 
             if (slot == null)
             {
-                Console.WriteLine($"[ERROR] PlugModuleToSlot: slot id {slotId} on rack '{rackName}' not found (will NOT create).");
+                Console.WriteLine($"[ERROR] PlugPluginToSlot: slot id {slotId} on rack '{rackName}' not found");
                 return false;
             }
 
-            // 3) 插入
             var slotIdLog = (slot as Tiema.Runtime.Models.SimpleSlot)?.Id ?? -1;
-            Console.WriteLine($"[DEBUG] PlugModuleToSlot: found slot Name={slot.Name}, Id={slotIdLog}, IsOccupied={slot.IsOccupied}");
+            Console.WriteLine($"[DEBUG] PlugPluginToSlot: found slot Name={slot.Name}, Id={slotIdLog}, IsOccupied={slot.IsOccupied}");
 
             lock (slot)
             {
-                if (!slot.Plug(entry.Module))
+                if (!slot.Plug(entry.Plugin))
                 {
-                    Console.WriteLine($"[WARN] 插入模块失败，插槽已被占用: {rackName}/id:{slotId}");
+                    Console.WriteLine($"[WARN] Plug failed, slot occupied: {rackName}/id:{slotId}");
                     return false;
                 }
             }
 
-            // 4) 设置上下文并通知模块
-            try { entry.Context.SetCurrentSlot(slot); } catch (Exception ex) { Console.WriteLine($"[ERROR] 设置模块 Context.CurrentSlot 失败: {ex}"); }
+            try { entry.Context.SetCurrentSlot(slot); } catch (Exception ex) { Console.WriteLine($"[ERROR] Set Context.CurrentSlot failed: {ex}"); }
 
             try
             {
-                entry.Module.OnPlugged(slot);
+                entry.Plugin.OnPlugged(slot);
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[ERROR] 模块 {entry.Module.Name} OnPlugged 异常: {ex}");
+                Console.WriteLine($"[ERROR] Plugin {entry.Plugin.Name} OnPlugged error: {ex}");
             }
 
             return true;
         }
 
-        /// <summary>
-        /// 将模块从所在插槽拔出。
-        /// Unplug module from its current slot.
-        /// </summary>
-        public bool UnplugModule(string moduleId)
+        // Unplug plugin from its current slot.
+        public bool UnplugPlugin(string pluginId)
         {
-            if (string.IsNullOrEmpty(moduleId)) return false;
-            if (!_modules.TryGetValue(moduleId, out var entry)) return false;
+            if (string.IsNullOrEmpty(pluginId)) return false;
+            if (!_plugins.TryGetValue(pluginId, out var entry)) return false;
 
-            // 从 ModuleContext 获取当前插槽（接口契约：CurrentSlot 可能在未插入时抛异常）
             ISlot slot;
             try
             {
@@ -499,26 +448,21 @@ namespace Tiema.Runtime
             }
             catch (Exception)
             {
-                // 如果 CurrentSlot 不可用，则回退到尝试通过模块保存的 CurrentSlot（若模块继承 ModuleBase）
-                // 但优先以 context 为准；若确实没有插槽，则无法拔出
-                Console.WriteLine($"[WARN] 模块 {entry.Module.Name} 当前无插槽信息 / no current slot info");
+                Console.WriteLine($"[WARN] Plugin {entry.Plugin.Name} has no current slot info");
                 return false;
             }
 
-            // 通知模块拔出（接口调用，支持任意实现）
             try
             {
-                entry.Module.OnUnplugged();
+                entry.Plugin.OnUnplugged();
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[ERROR] 模块 {entry.Module.Name} OnUnplugged 异常: {ex}");
+                Console.WriteLine($"[ERROR] Plugin {entry.Plugin.Name} OnUnplugged error: {ex}");
             }
 
-            // 清理上下文中的当前插槽引用
             entry.Context.SetCurrentSlot(null);
 
-            // Dispose auto-registrations created for this module (subscriptions, tasks...)
             try
             {
                 foreach (var d in entry.AutoRegistrations)
@@ -529,7 +473,6 @@ namespace Tiema.Runtime
             }
             catch { /* best effort */ }
 
-            // 卸载插槽中的模块引用
             try
             {
                 lock (slot)
@@ -539,7 +482,7 @@ namespace Tiema.Runtime
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[ERROR] 卸载插槽失败: {ex}");
+                Console.WriteLine($"[ERROR] Unplug slot failed: {ex}");
             }
 
             return true;

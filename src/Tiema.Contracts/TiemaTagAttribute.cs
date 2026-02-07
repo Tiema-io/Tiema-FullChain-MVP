@@ -1,6 +1,7 @@
 
 using System;
-using Tiema.Protocols.V1;
+
+using Tiema.Tags.Grpc.V1;
 
 namespace Tiema.Contracts
 

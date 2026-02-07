@@ -8,8 +8,8 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\Tiema.DataConnect.Core\Tiema.DataConnect.Core.csproj" />
     <ProjectReference Include="..\Tiema.Protocols\Tiema.Protocols.csproj" />
-    <ProjectReference Include="..\Tiema.Runtime\Tiema.Runtime.csproj" />
   </ItemGroup>
 
 </Project>

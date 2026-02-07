@@ -3,7 +3,7 @@ using System.Collections.Concurrent;
 using System.Threading;
 using System.Threading.Tasks;
 using Tiema.Hosting.Abstractions;
-using Tiema.Protocols.V1;
+using Tiema.Tags.Grpc.V1;
 using Tiema.Runtime.Services;
 using Xunit;
 using Google.Protobuf.WellKnownTypes;

@@ -20,14 +20,14 @@ namespace Tiema.Runtime.Models
         public int Id { get; }
         public string Name { get; private set; } // 只读属性
         public IRack Rack { get; }
-        public IModule Module { get; private set; }
-        public bool IsOccupied => Module != null;
+        public IPlugin Plugin { get; private set; }
+        public bool IsOccupied => Plugin != null;
 
-        public bool Plug(IModule module)
+        public bool Plug(IPlugin plugin)
         {
-            if (module == null) return false;
+            if (plugin == null) return false;
             if (IsOccupied) return false;
-            Module = module;
+            Plugin = plugin;
 
        
             return true;
@@ -35,7 +35,7 @@ namespace Tiema.Runtime.Models
 
         public void Unplug()
         {
-            Module = null;
+            Plugin = null;
         }
 
 

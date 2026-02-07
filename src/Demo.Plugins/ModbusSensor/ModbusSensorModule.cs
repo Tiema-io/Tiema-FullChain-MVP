@@ -3,7 +3,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Tiema.Sdk;
 
-using Tiema.Protocols.V1;
+using Tiema.Tags.Grpc.V1;
 using Tiema.Contracts;     // TagRole for attribute
 
 namespace ModbusSensor
@@ -11,7 +11,7 @@ namespace ModbusSensor
     /// <summary>
     /// 模拟 Modbus 传感器插件：周期生成温度并写入 Tag 系统（仅使用宿主提供的 Context.Tags）。
     /// </summary>
-    public class ModbusSensorPlugin : ModuleBase
+    public class ModbusSensorPlugin : PluginBase
     {
         public override string Name => "ModbusSensor";
 

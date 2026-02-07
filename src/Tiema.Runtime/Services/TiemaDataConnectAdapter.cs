@@ -17,14 +17,14 @@ namespace Tiema.Runtime.Services
     /// 上层负责把 DTO 序列化为 protobuf 并发送到远端；远端收到 TagBatch 后同样可由上层反序列化
     /// 为 TagBatchDto 并调用 Adapter.OnTagBatchReceived 做原样回填。
     /// </summary>
-    public sealed class TiemaBackplaneAdapter : IDisposable
+    public sealed class TiemaDataConnectAdapter : IDisposable
     {
         private readonly IBackplane _transport;
         private readonly ITagRegistrationManager _registrationManager;
         private readonly ConcurrentDictionary<string, IoAssembly> _assemblies = new(StringComparer.OrdinalIgnoreCase);
         private bool _disposed;
 
-        public TiemaBackplaneAdapter(IBackplane transport, ITagRegistrationManager registrationManager)
+        public TiemaDataConnectAdapter(IBackplane transport, ITagRegistrationManager registrationManager)
         {
             _transport = transport ?? throw new ArgumentNullException(nameof(transport));
             _registrationManager = registrationManager ?? throw new ArgumentNullException(nameof(registrationManager));
@@ -39,9 +39,9 @@ namespace Tiema.Runtime.Services
         /// 注册插件提供的 Tags（会调用 RegistrationManager 并返回分配结果）。
         /// 这里作为示例方法，实际可能通过 RegistrationManager 或 RPC 与远端协调。
         /// </summary>
-        public IEnumerable<TagIdentity> RegisterTags(string moduleInstanceId, IEnumerable<string> producerPaths, IEnumerable<string> consumerPaths)
+        public IEnumerable<TagIdentity> RegisterTags(string pluginInstanceId, IEnumerable<string> producerPaths, IEnumerable<string> consumerPaths)
         {
-            var identities = _registrationManager.RegisterModuleTags(moduleInstanceId, producerPaths, consumerPaths);
+            var identities = _registrationManager.RegisterModuleTags(pluginInstanceId, producerPaths, consumerPaths);
             // TODO: 根据 identities 中的 assemblyId（若有）把 handle 绑定到 assembly 并启动
             return identities;
         }

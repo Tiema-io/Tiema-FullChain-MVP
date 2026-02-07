@@ -10,7 +10,7 @@ namespace Tiema.Runtime.Models
     /// 模块配置（原 PluginConfig -> ModuleConfig）
     /// Module configuration (renamed from PluginConfig)
     /// </summary>
-    public class ModuleConfig
+    public class PluginConfig
     {
         [JsonPropertyName("name")]
         public string Name { get; set; } = string.Empty;

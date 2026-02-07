@@ -1,0 +1,15 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Tiema.Contracts\Tiema.Contracts.csproj" />
+    <ProjectReference Include="..\Tiema.Hosting.Abstractions\Tiema.Hosting.Abstractions.csproj" />
+    <ProjectReference Include="..\Tiema.Protocols\Tiema.Protocols.csproj" />
+  </ItemGroup>
+
+</Project>

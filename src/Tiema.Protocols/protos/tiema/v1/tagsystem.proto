@@ -1,0 +1,118 @@
+﻿// tagsystem.proto
+// Tiema Tag model and helper messages (MVP)
+
+syntax = "proto3";
+
+package tiema.protocols.v1;
+
+option csharp_namespace = "Tiema.Tags.Grpc.V1";
+
+import "google/protobuf/timestamp.proto";
+
+// Quality codes
+enum QualityCode {
+  QUALITY_UNKNOWN = 0;
+  QUALITY_GOOD = 1;
+  QUALITY_BAD = 2;
+}
+
+// Tag role
+enum TagRole {
+  TAG_ROLE_UNSPECIFIED = 0;
+  TAG_ROLE_PRODUCER = 1;
+  TAG_ROLE_CONSUMER = 2;
+}
+
+// Single Tag value
+message TagValue {
+  uint32 handle = 1;          // global handle
+  string path = 2;            // full tag path (e.g., site/rack/slot/tag)
+  google.protobuf.Timestamp timestamp = 3;
+
+  oneof value {
+    bool bool_value = 4;
+    int64 int_value = 5;
+    double double_value = 6;
+    string string_value = 7;
+    bytes bytes_value = 8;
+  }
+
+  QualityCode quality = 9;
+  TagRole role = 10;
+
+  // Use plugin terminology (MVP)
+  string source_plugin_instance_id = 11;     // producer plugin instance id
+  string reference_plugin_instance_id = 12;  // consumer plugin instance id
+
+  map<string, string> metadata = 13;
+}
+
+// Tag batch
+message TagBatch {
+  string plugin_instance_id = 1;  // sender plugin instance id
+  repeated TagValue tags = 2;
+}
+
+// Registration info
+message RegisterTagInfo {
+  string source_plugin_instance_id = 1;
+  uint32 handle = 2;
+  string tag_path = 3;      // corresponds to TagValue.path
+  TagRole role = 4;
+  string reference_plugin_instance_id = 5;
+}
+
+message RegisterTagsRequest {
+  string plugin_instance_id = 1;          // request-level default
+  repeated RegisterTagInfo tags = 2;      // batch registration
+}
+
+message RegisterTagsResponse {
+  bool success = 1;
+  repeated RegisterTagInfo assigned = 2;  // per-item assignment (with handle)
+  string message = 3;
+}
+
+// Subscribe request
+message SubscribeRequest {
+  uint32 handle = 1;               // optional single-handle subscribe
+  repeated RegisterTagInfo tags = 2;
+  uint32 rpi_ms = 3;               // requested packet interval (0 = on change)
+  string subscriber_id = 4;        // optional subscriber id for dedup
+}
+
+// Optional single-handle shortcut
+message SubscribeSingleRequest {
+  uint32 handle = 1;
+  string subscriber_id = 2;
+}
+
+// Publish / Get
+message PublishRequest {
+  oneof payload {
+    TagValue tag = 1;
+    TagBatch batch = 2;
+  }
+}
+
+message PublishResponse {
+  bool success = 1;
+  string message = 2;
+}
+
+message GetRequest {
+  uint32 handle = 1;
+}
+
+message GetResponse {
+  bool found = 1;
+  TagValue value = 2;
+}
+
+// Server->Client updates
+message Update {
+  oneof payload {
+    TagValue tag = 1;
+    TagBatch batch = 2;
+  }
+}

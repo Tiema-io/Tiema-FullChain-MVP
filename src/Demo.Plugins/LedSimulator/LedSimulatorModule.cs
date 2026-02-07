@@ -11,7 +11,7 @@ namespace LedSimulator
     /// LED 模拟器模块：实现 IIndicatorService，并在插槽插入时注册到宿主 registry。
     /// Registers as service name: "device.output.indicator.led" (slot-scoped).
     /// </summary>
-    public class LedSimulatorModule : ModuleBase, IIndicatorService
+    public class LedSimulatorModule : PluginBase, IIndicatorService
     {
         public override string Name => "LedSimulator";
 
