@@ -5,7 +5,7 @@ using Tiema.DataConnect.Core;
 using Tiema.Connect.Grpc.V1;
 using static Tiema.Connect.Grpc.V1.DataConnect; // for BindService
 
-namespace Tiema.BackplaneService
+namespace Tiema.DataConnect.Service
 {
     internal static class Program
     {

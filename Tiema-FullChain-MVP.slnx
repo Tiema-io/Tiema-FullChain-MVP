@@ -33,7 +33,7 @@
     <File Path="AssemblyInfo.cs" />
   </Folder>
   <Folder Name="/tests/">
-    <Project Path="tests/Tiema.Backplane.SmokeTest/Tiema.DataConnect.SmokeTest.csproj" Id="2f501653-4511-4ba6-9792-8eb8605f9890" />
+    <Project Path="tests/Tiema.DataConnect.SmokeTest/Tiema.DataConnect.SmokeTest.csproj" />
   </Folder>
   <Folder Name="/解决方案项/">
     <File Path="README.md" />

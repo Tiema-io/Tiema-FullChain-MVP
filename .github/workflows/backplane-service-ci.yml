@@ -31,8 +31,10 @@ jobs:
 
       - name: Start Tiema.DataConnect.Service (background)
         run: |
-          dotnet run --project src/Tiema.DataConnect.Service --configuration Release --no-build & echo $! > dc.pid
-          echo "Started DataConnect server, pid: $(cat dc.pid)"
+          # ensure the specific project is built (dotnet build was run earlier globally)
+          nohup dotnet run --project src/Tiema.DataConnect.Service --configuration Release > dc.log 2>&1 &
+          echo $! > dc.pid
+          echo "Started DataConnect server, pid: $(cat dc.pid). Logs at dc.log"
       
       - name: Wait for port
         run: |
